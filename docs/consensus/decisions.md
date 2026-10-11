@@ -1,4 +1,6 @@
-# Consensus open decisions
+# Native integration open decisions
+
+<a id="consensus-open-decisions"></a>
 
 **The base Engine/Marshal connection already exists.** Remaining application choices concern body validity/bounds, scheduling and state application. Full Baton's change to authenticated ordering requires native protocol work beyond those callbacks.
 

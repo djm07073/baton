@@ -1,10 +1,16 @@
-# Consensus: roles and native structure
+# Multimmit: native consensus
+
+<a id="consensus-roles-and-native-structure"></a>
 
 **Connect one App to the existing Multimmit Engine and Multimmit Marshal.** Engine owns producer lanes, DA, voting and finality. Marshal owns complete block custody, history/body backfill, canonical ordering and delivery. App owns its TxPool, PreCut or Baton scheduler, transaction execution and application state.
 
 This page follows the current parent checkout at [6233438985d8249d2b2bc1204191d5d405652288](https://github.com/0xEyrie/monorepo/tree/6233438985d8249d2b2bc1204191d5d405652288). The earlier `534af0...` research pin predates this Marshal implementation. See [source status](../reference/sources.md).
 
-## Roles and responsibilities
+Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../overview/interfaces.md#diagram-notation) for contracts and implementation ownership.
+
+<a id="roles-and-responsibilities"></a>
+
+## Communication interfaces
 
 | Existing boundary | Caller → implementation | App work |
 |---|---|---|
@@ -22,17 +28,15 @@ Multimmit uses `n ≥ 5f+1`; Baton comparisons use `n=5f+1`. Keep native tip ext
 
 ```mermaid
 flowchart TB
-    N[Native network planes] --> I[Ingress and verifier]
-    I --> V[Voter runtime shell]
-    R[Native proof resolver] <--> V
-    V <--> M[Machine: producer, DA, view, finality]
-    V <--> J[Native safety journal]
-    V -->|propose / verify| A[App: TxPool, scheduler, execution, state]
-    A -->|custody calls / ACK| S[Existing Multimmit Marshal]
-    V -->|Activity and Relay requests| S
-    B[Body broadcast and backfill channels] <--> S
-    S -->|ordered Update| A
-    A -. Baton policy: future .-> M
+    N["Native network planes"] -->|"wire: native artifacts"| I["Ingress and verifier"]
+    I --> V["Voter runtime shell"]
+    R["Native proof resolver"] <--> V
+    V <-->|"native internal transitions"| M["Machine: producer, DA, view, finality"]
+    V <--> J["Native safety journal"]
+    V -->|"[C] Automaton::propose / verify"| A["App Alignment layer<br/>callback handles"]
+    A <-->|"[C] App calls custody / ACK<br/>Marshal calls report(Update)"| S["Existing Multimmit Marshal"]
+    V -->|"[C] Reporter::report / Relay::broadcast"| S
+    B["Body broadcast and backfill channels"] <--> S
     classDef reuse fill:#dbeafe,stroke:#2563eb,color:#172554;
     classDef app fill:#dcfce7,stroke:#16a34a,color:#14532d;
     class N,I,V,R,M,J,S,B reuse;
@@ -40,6 +44,8 @@ flowchart TB
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-16.svg)
+
+Unlabelled edges and native-transition labels show internal actor/data dependencies, not additional public method calls. The labelled App crossings use the existing interfaces in the table above.
 
 | Current source | Responsibility |
 |---|---|

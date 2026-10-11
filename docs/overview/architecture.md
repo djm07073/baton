@@ -1,46 +1,57 @@
 # Architecture
 
-**Multimmit orders blocks, Marshal stores and delivers them, and one App owns transactions and execution.** Inside App, select either the Pre-cut scheduler or the Baton scheduler. Existing Commonware callbacks connect these components; no additional public layer traits are required.
+**Consensus orders blocks; Alignment schedules; App Executor computes; Storage stores and supplies canonical checkpoints.** Alignment, Executor and Storage are separate responsibilities inside one App. Existing Marshal supplies custody, body exchange and ordered delivery. Alignment layer implements existing native callbacks and selects the proposed common Alignment implementation: PreCut or Baton.
+
+Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [communication reference](interfaces.md#diagram-notation) for call/event notation.
 
 ## Application composition
 
 ```mermaid
 flowchart TB
-    N[Multimmit engine] -->|propose / verify| A
-    N -->|Relay / Activity| M[Multimmit Marshal]
-    M -->|ordered Update| A
-    A -->|stage / subscribe / fetch| M
-    subgraph APP[Application]
-        T[Transaction pool] -->|select batch| A[Existing callback handles]
-        A -->|usable candidate| S[Pre-cut or Baton scheduler]
-        S -->|exact-parent job| E[Execution workers and checkpoints]
-        A -->|canonical input| E
-        E -->|selected effects| W[State backend and canonical writer]
+    N["Consensus<br/>Multimmit Engine"] -->|"[C] Automaton::propose / verify"| M
+    N -->|"[C] Relay::broadcast<br/>Reporter::report(Activity)"| R["Existing Multimmit Marshal"]
+    M <-->|"[C] App calls stage / subscribe / fetch / ACK<br/>Marshal calls report(Update)"| R
+    subgraph APP["Application"]
+        subgraph MW["Alignment layer"]
+            M["Callback handles and Update owner"]
+            M <-->|"[P] Alignment::admit / commit(ordered)<br/>internal AlignmentPolicy::next"| S["PreCutAlignment<br/>or BatonAlignment<br/>pub(crate) implementations"]
+        end
+        P["App pool and payload code"]
+        E["App Executor<br/>execution and in-memory checkpoints"]
+        C["Storage<br/>cold reads, certification and persistence"]
+        M -->|"[A] pool.select(ctx, limits)"| P
+        M <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges"| E
+        M <-->|"[P] Storage::submit / certify<br/>StorageEvent::Prepared / Committed"| C
+        E <-->|"[P] Storage::read(view, key)<br/>pinned cold state"| C
+        C -->|"[A] via App owner<br/>execution.install_checkpoint"| E
     end
-    W -->|ACK after durable apply| M
-    W --> Q[Commonware QMDB]
+    C -->|"[C] apply / finalize / Barrier::durable"| Q["QMDB / DatabaseSet"]
     classDef reuse fill:#dbeafe,stroke:#2563eb,color:#172554;
     classDef app fill:#dcfce7,stroke:#16a34a,color:#14532d;
-    class N,M,Q reuse;
-    class T,A,S,E,W app;
+    class N,R,Q reuse;
+    class M,S,P,E,C app;
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-01.svg)
 
-Blue boxes are existing components. Green boxes are application responsibilities and can be ordinary modules sharing one owner and concrete handles. The diagram does not prescribe one actor per box. Workers keep slow execution and I/O off short callback handlers. Commonware runtime and authenticated P2P supply task and transport mechanisms.
+Blue boxes are existing components. Green boxes separate App pool, Alignment, Executor and Storage responsibilities; they can share one owner and concrete handles. The [interface map](interfaces.md#proposed-alignment-interface) separates public `Alignment` calls from crate-internal `AlignmentPolicy::next`. Both alignment implementations share those contracts and use the separate public [`Storage`](interfaces.md#proposed-storage-interface) contract for certificate verification and durable application. The diagram does not prescribe one actor per box. Executor workers compute in memory; Storage owns storage I/O. Both keep slow work off short callback handlers. Commonware runtime and authenticated P2P supply task and transport mechanisms.
 
 <a id="four-layers"></a>
 
-## Responsibilities and existing entry points
+<a id="responsibilities-and-existing-entry-points"></a>
 
-| Owner | Implement or reuse | Boundary |
+## Responsibilities and communication
+
+| Component | Responsibility | Communication |
 |---|---|---|
-| Multimmit | Reuse engine, deterministic machine, actors and native verifier/resolver | Producer/DA/view/finality authority |
-| Multimmit Marshal | Reuse service, relay, mailbox, catalog, backfill and delivery | Durable full blocks, native exact ordered stream, delivery cursor |
-| App pool | Implement admission and bounded selected-candidate packing; adapt a fitting existing pool where useful | Client/peer ingress and `Automaton::propose` |
-| App scheduler | Implement Pre-cut and Baton scheduling using shared execution state | Usable candidates, worker completions and canonical Updates |
-| App execution | Implement transaction semantics, exact-parent reuse/repair, certification and peer sync | Commonware workers, crypto and P2P |
-| App state backend | Integrate QMDB branch/material operations and a recoverable canonical writer | Effects → selected root → apply/durability |
+| [Multimmit](../consensus/README.md) | Producer lanes, DA, views and native finality | Calls App Automaton; sends Activity and relay requests to Marshal |
+| [Marshal](../consensus/block-body.md) | Full blocks, native history, backfill and ordered delivery | Custody mailbox calls; indexed Update and application ACK |
+| [App coordination](../baton/README.md) | Callback intake, lifecycle, claimed dispatch and Update tokens | Connects pool, policy, execution, result processing and Storage |
+| [TxPool](../tx/interfaces.md) | Admission, retained candidates and bounded selection | Transactions in; proposal batches out; durable outcomes for maintenance |
+| [Alignment](../baton/direction.md) | Eligible pending work and finalized-order reflection | `admit/commit`; internal `next` selects an intent from the execution view |
+| [Executor](../execution/README.md) | Transaction computation and in-memory checkpoints | Exact-parent jobs, StateChanges, pinned cold reads and checkpoint installation |
+| [Storage](../execution/storage.md) | Roots, certificate verification, persistence and recovery | `read/submit/certify`; `Prepared/Committed/Failed` events |
+| [App result processing](../execution/interfaces.md) | Direct signing and peer signature collection | Executor evidence + Storage commitments → certificate for Storage |
 
 The current source is [Commonware checkout 6233438](https://github.com/0xEyrie/monorepo/tree/6233438985d8249d2b2bc1204191d5d405652288). Current Multimmit Marshal replaces the older proposed application body service and ordinary Baton-owned order-delivery machinery. Historical research pinned to `534af0e` remains useful for its stated questions, but does not describe this new assembly.
 
@@ -58,8 +69,9 @@ The current source is [Commonware checkout 6233438](https://github.com/0xEyrie/m
 | Native consensus | Header/DA/view/certificate planes → native machine | Authenticated lane and ordering facts |
 | Speculation | Usable candidate → App scheduler → exact-parent execution | Completed local effects for a particular path |
 | Baton control | Intended-order report → bounded selection → advisory direction | Execution intention; no finality or result proof |
-| Canonical delivery | Native history → Marshal → indexed Update → App | Continuous native ordered input |
-| Application durability | Matching/repaired/certified material → canonical writer → ACK | Locally recoverable applied state and input position |
+| Canonical delivery | Native history → Marshal → indexed Update → Alignment::commit(ordered) | Continuous finalized ordering, independent of execution progress |
+| Application durability | Executor effects → Storage preparation → App result collection → Storage Committed event → ACK | Recoverable certified state, outputs, certificate evidence and applied position |
+| Execution catch-up | Storage checkpoint → App owner → Executor installation | Skip the exact covered input and resume from its usable state view |
 | Result certification | Peer Apps exchange signatures over the exact statement | `f+1` matching distinct signatures plus irrevocable order/base establish the research result endpoint |
 
 Body custody, speculation, native finality, result certification and local durable application are separate facts. Body/header ancestry does not supply the cross-lane execution state parent. Only matching exact input/base/runtime permits reuse.

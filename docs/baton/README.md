@@ -1,39 +1,49 @@
-# Connect the application to Multimmit
+# App: coordination and ownership
 
-**Implement one application with a transaction pool, a Pre-cut or Baton scheduler, and transaction execution. Connect it through the existing `Automaton` and `Reporter` traits. Reuse Multimmit Marshal for block custody, body exchange and ordered delivery.**
+<a id="connect-the-application-to-multimmit"></a>
 
-The name `App` below means the application being designed. It is not a new Commonware trait. The native `AppExecutor` runs local `Automaton::propose/verify` jobs; it does not execute application transactions. Transaction execution runs in workers owned by App.
+**App coordination connects native callbacks to the pool, Alignment, Executor, result processing and Storage.** It owns lifecycle, shared dispatch and retained Update tokens. Existing Multimmit Marshal supplies block custody, body exchange and ordered delivery.
+
+The name `App` below means the application being designed. Inside it, **Alignment layer** owns callback/delivery handling and scheduling; **App Executor** owns transaction computation and in-memory checkpoints; **Storage** owns persistent state, certification checks and checkpoint import/recovery. The pool remains a separate App responsibility. These are responsibility groups, not mandated processes. The native `AppExecutor` runs local `Automaton::propose/verify` jobs; it does not execute application transactions. See the [responsibility map](../overview/interfaces.md#consensus-alignment-and-app-executor).
 
 This design uses the current local Commonware checkout, [6233438](https://github.com/0xEyrie/monorepo/tree/6233438985d8249d2b2bc1204191d5d405652288). Earlier research against `534af0e` predates its Multimmit Marshal. Application scheduling, the transaction runtime and Baton policy integration described here remain to be implemented.
 
 <a id="roles-and-responsibilities"></a>
 
-## The smallest useful composition
+## Responsibilities
 
-| Component | Responsibility | Connection |
-|---|---|---|
-| Multimmit engine | Producer lanes, DA, leader proposals, votes and native finality | Calls App's `Automaton`; uses Marshal's relay and activity reporter |
-| Multimmit Marshal | Full block custody, body broadcast/fetch, verified history, dense native order and delivery cursor | Its mailbox serves App; its delivery worker calls App's `Reporter<Update>` |
-| [App transaction pool](../tx/interfaces.md) | Transaction admission, selected/unselected retention and bounded batch selection | `propose` selects from it; durable canonical outcomes update it internally |
-| App scheduler | Eligible candidates, pending order, exact execution parents and worker dispatch | Pre-cut or Baton implementation selected at startup |
-| App execution and state | Transaction effects, checkpoints, selected roots, result certification, state sync and durable application | Existing runtime, crypto, P2P and QMDB handles |
+| Owned responsibility | What the App owner coordinates |
+|---|---|
+| Native callback intake | Route payload construction/validation to the pool and custody path |
+| Speculative dispatch | Admit eligible candidates, request a policy intent, recheck context and claim resources before launch |
+| Ordered input | Retain complete indexed Updates and tokens; immediately reflect continuous ordering in Alignment |
+| Independent completions | Accept current execution results and route Storage events without blocking other intake |
+| Durable publication | Retain/forward usable checkpoints, ACK covered Updates and schedule pool maintenance |
+| Lifecycle | Recovery readiness, stale-worker fencing, retained queues and shutdown |
 
-Pool, scheduler, execution and storage code can be separate files inside App. These responsibilities do not require separate public `TxPool`, `Baton`, `Executor`, `Storage`, `BlockService` or `Orderer` traits. Keep the existing Commonware interfaces at the actual engine boundary. [Architecture](../overview/architecture.md) shows this composition.
+The callback handles and shared owner are coordination roles inside App. The proposed `Alignment`/internal `AlignmentPolicy` and `Storage` contracts connect the policy and state responsibilities; concrete pool, execution and result helpers remain private. [Architecture](../overview/architecture.md) shows the composition.
 
-Pre-cut and Baton share application execution and storage. **Pre-cut has no Baton instance, reports, directions or native policy change.** Baton adds authenticated intended-order reports and direction selection to local speculative scheduling. Use two concrete scheduler implementations or a local mode enum; no generic scheduling framework is required.
+Pre-cut and Baton share the same execution, certification and storage path. Pre-cut has no Baton instance, reports, directions or native policy change. Baton adds intended-order collection and advisory direction; authenticated native policy adoption remains separate unfinished work.
 
 <a id="report-connection"></a>
 
-## What App implements
+<a id="what-app-implements"></a>
 
-Follow the [assembly and callback handlers](interfaces.md#assemble-before-opening-the-engine) for the connection sequence.
+## Communication interfaces
 
-| Existing entry point | App action | Completion means |
+| Direction | Interface or value | Completion means |
 |---|---|---|
-| `Automaton::propose(context)` | Select transactions; construct `TransactionBlock` for the producer context; stage it through Marshal | Resolve the returned receiver with the **body digest** after accepted staging; the subsequent local custody verification must still succeed |
-| `Automaton::verify(context, body_digest)` | Obtain the exact full block; validate payload/context and durable custody; register usable local candidate metadata with the selected scheduler | Resolve the returned receiver with `true` for a valid, durably held/reconstructible payload; speculative execution is independent |
-| Marshal `Reporter<Activity = Update<Block>>::report(update)` | Transfer the indexed full block and ACK token into App's retained delivery inbox | Synchronous local handoff only; a worker applies the exact canonical input and ACKs after durable completion |
-| Optional native `Reporter<Activity = Activity<V,D>>::report(activity)` | Observe native admission, local proposal or finality hints used by optional scheduling | Best-effort observation; it does not replace Marshal's ordered `Update` stream |
+| Multimmit → App | `Automaton::propose/verify` | Receivers later yield a body digest or payload/custody verdict |
+| Marshal → App | `Reporter::report(Update)` | Full indexed block and ACK token retained; `Feedback` completes the handoff |
+| App → TxPool | `pool.select` / `pool.reconcile` | Stable proposal bytes / maintenance from durable outcomes |
+| App → Alignment | `admit(candidate)`, `commit(ordered)` | Eligible candidate retained or finalized ordering reflected |
+| App dispatch → Alignment policy | Internal `AlignmentPolicy::next(view)` | `JobIntent` or `None`; the owner still claims the job |
+| App → Executor | `execution.execute/reconcile` | Exact-parent `ExecutionOutcome` / ordered StateChanges |
+| App → Storage | `Storage::submit/certify` | Work or evidence retained; events complete later stages |
+| Storage → App → Executor | `StorageEvent::Committed(applied)`, then `execution.install_checkpoint` | Certified durable identity published and a usable execution base handed over |
+| App → Marshal | `update.acknowledgement.acknowledge()` | Matching delivery covered by certified durable App state |
+
+[Native callbacks](interfaces.md) expand propose, verify and Update handling. The [communication reference](../overview/interfaces.md) defines exact values and completion/failure contracts. **[C]** is existing Commonware, **[P]** a proposed contract, **[A]** private App behavior and **[X]** unfinished native work. These names identify responsibilities rather than requiring one public trait per connection.
 
 Use Marshal's existing `Relay` implementation. Its broadcast key is the **full header/block digest**, which locates the staged full block; this differs from the body digest returned by `propose` and passed to `verify`. The native wire carries signed headers separately from the Marshal body broadcast. A receiver may therefore have the header before the body. [Body flow](../consensus/block-body.md) explains these identities and custody stages.
 
@@ -69,7 +79,7 @@ The scheduler separates **candidate admission** from **dispatch**. A body can be
 
 Marshal reports continuous indexed blocks in its existing native order. App treats each `Update` as authoritative ordered input, reconciles the speculative path, and uses an exact matching completed result when available. Otherwise it finishes or repairs the required work. It then prepares/applies the selected state through the application's canonical writer.
 
-The ACK token is completed **after durable application**, including enough applied-position/identity metadata to recover idempotently. If speculation already finished on the correct parent, this path may mainly select the result and perform storage I/O. ACK does not mandate rerunning transactions. It also cannot turn unfinished execution into durable state merely because the block entered a queue.
+`Alignment::commit(ordered)` reflects the new finalized ordering as soon as the indexed input is retained. It waits for neither execution nor certification. Storage requires a matching verified `f+1` certificate before canonical application, then makes state, outputs, certificate evidence and applied identity recoverable. Only that certified durable completion releases the ACK token. Completed speculation can avoid rerunning transactions, but still needs certification. An ordering notification or queued block cannot authorize ACK.
 
 Marshal can deliver several blocks before earlier ACKs arrive, up to `max_pending_acks`. A full window holds further application delivery; the native consensus engine does not wait for these ACKs to vote or finalize. Marshal persists its own delivery cursor separately after acknowledged progress. App must handle redelivery after a crash between application durability and Marshal cursor durability. See [the complete Update/ACK flow](interfaces.md#marshal-reportupdate-canonical-input-and-ack).
 
@@ -79,6 +89,6 @@ Marshal can deliver several blocks before earlier ACKs arrive, up to `max_pendin
 
 Baton scheduling owns the report window, intended-order snapshot, bounded candidate evaluation and advisory direction. Reports bind epoch, view, history, canonical parent, rule, window and frontier. They express intention, not execution completion. Reuse the existing Clock, runtime tasks, crypto, codec and authenticated P2P for this work. Bound both retained messages and submitted CPU work; an unordered future pool alone is not a capacity limit.
 
-The ordinary local rule is `F ++ sort_G(S_pending)`: preserve completed/current execution order and sort only eligible work not yet started. Cut readiness never waits for reports, a timer, planning, speculative execution or a direction reply. Details and the remaining protected-prefix integration obligation are in [Scheduler behavior and direction](direction.md).
+The ordinary local rule is `F ++ sort_G(S_pending)`: preserve completed/current execution order and sort only eligible work not yet started. Cut readiness never waits for reports, a timer, planning, speculative execution or a direction reply. Details and the remaining protected-prefix integration obligation are in [Alignment behavior and direction](direction.md).
 
 **An app-only Baton scheduler can guide speculation today; it cannot make its preferred order canonical by rearranging Marshal Updates.** The full research objective still needs an authenticated native policy/adoption mechanism and consistent history interpretation. Keep this explicit rather than adding a facade that makes the missing protocol work appear implemented.

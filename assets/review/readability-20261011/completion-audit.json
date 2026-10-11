@@ -1,0 +1,43 @@
+{
+  "requirements": [
+    {
+      "requirement": "One reading path from overview through component responsibilities and communication to E2E",
+      "status": "verified",
+      "sources": [
+        "docs/README.md",
+        "docs/SUMMARY.md"
+      ],
+      "evidence": "All 33 generated page menus, titles and previous/next labels match the current SUMMARY; detailed contracts and development are reference material after E2E."
+    },
+    {
+      "requirement": "Distinct Alignment, Executor, Storage and result-processing responsibilities and communication",
+      "status": "verified",
+      "sources": [
+        "docs/baton/direction.md",
+        "docs/execution/README.md",
+        "docs/execution/storage.md",
+        "docs/execution/interfaces.md"
+      ],
+      "evidence": "Independent navigation entries and responsibility/communication sections identify policy selection, in-memory computation, persistence and signing/collection with caller, values and completion conditions."
+    },
+    {
+      "requirement": "Distinguish component contracts from E2E flows and connect the reading sequence",
+      "status": "verified",
+      "sources": [
+        "docs/consensus/block-body.md",
+        "docs/execution/state-sync.md",
+        "docs/e2e/block-body.md",
+        "docs/e2e/state-sync.md",
+        "docs/e2e/normal.md"
+      ],
+      "evidence": "33 unique page titles; custody vs publication/retrieval and checkpoint handoff vs certified import are separately named. All 9 E2E pages link prerequisite component explanations."
+    }
+  ],
+  "current_source_and_html_hashes": 33,
+  "unique_navigation_titles": 33,
+  "e2e_prerequisite_links": 9,
+  "browser_failures": [],
+  "mobile_navigation": "passed",
+  "source_downloads": 3,
+  "scope": "Documentation readability and navigation; no runtime or protocol validation."
+}

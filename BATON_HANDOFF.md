@@ -1,6 +1,20 @@
 # Baton — current research handoff
 
-Updated 2026-10-09. The newest decision below supersedes earlier architecture entries; those entries preserve research and publication history. Research/specification work only; no completed Baton native integration proof or application E2E results.
+Updated 2026-10-11. The newest decision below supersedes earlier architecture entries; those entries preserve research and publication history. Research/specification work only; no completed Baton native integration proof or application E2E results.
+
+## 2026-10-11 Component reading order
+
+The current docs reading path is overview → component responsibilities and communication → E2E flows → reference/development. Component pages lead with ownership, communication direction, values and completion conditions. Executor, Storage and App result processing are described separately; the Storage page is docs/execution/storage.md. The detailed canonical contract remains docs/overview/interfaces.md, now a communication reference after E2E in navigation. Existing Rust declarations and backend surveys are reference material. SUMMARY.md, the start page and generated previous/next navigation use the same order. The documentation now has 33 content pages; all 19 Mermaid sources and the proposed trait contracts are unchanged by this readability edit.
+
+## 2026-10-11 Alignment interface and call flows
+
+Current documentation distinguishes Consensus, Alignment layer and App Executor. The last two remain inside App; existing Marshal supplies body custody, exchange and ordered delivery. `pub trait Alignment` exposes `admit` and `commit`; `pub(crate) trait AlignmentPolicy: Alignment` adds `next` for shared internal dispatch. Crate-visible `PreCutAlignment` and `BatonAlignment` implement both traits. `next` only selects a JobIntent; the App owner rechecks current execution context and claims resources before launch. The interface map defines SDK-style implementation requirements for application integrators and Alignment authors. Baton report collection and direction selection are described as behavior, with private method names and decomposition left to the implementation.
+
+The internal AlignmentPolicy trait supports shared dispatch without another runtime layer. `Alignment::commit(ordered)` records finalized ordering promptly without execution, certification or durability waits. Using a supplied policy does not require reimplementing its traits. `pub(crate)` permits same-crate implementation; third-party extension requires an explicitly public contract.
+
+The storage module is named `Storage`. Its proposed public `Storage: Send + Sync` contract exposes `read(view, key)`, `submit(executed, changes)` and `certify(certificate)`, with retained `StorageEvent::Prepared`, `Committed` and `Failed` events. Executor owns computation and in-memory checkpoints, reads memory/parent overlays before a pinned cold read, and hands over StateChanges with exact ordered execution metadata. App result handling signs prepared direct work and collects certificates. Storage independently validates matching f+1 evidence, order/material/predecessor and owns roots, writes, physical batching, imports and recovery. Submission/certificate acceptance is not durability. Only Committed carries a recoverable certified checkpoint and permits covered Update ACKs by the retained owner. Physical batching must preserve deterministic signed history and drain within delivery-window, idle and shutdown constraints.
+
+Executor installs the Committed checkpoint, skips covered queued work, retires conflicts and ignores stale completions. It preserves compatible descendants, and frees covered overlays/pinned views only after references and workers release them. Certified import/recovery uses the same handoff; imported work never produces an own direct-execution signature. No Executor installation ACK is required. Cold read errors never mean absent data or a switch to current state. Accepted-but-uncommitted work is replayed after recovery if lost; mutable-store failures stop that instance. The canonical detailed contract is docs/overview/interfaces.md. These are design documents, not implemented Rust APIs; existing native signatures, historical paper/reviews and external publication remain separate.
 
 ## 2026-10-09 App-owned pool and schedulers
 

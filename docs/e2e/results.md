@@ -1,6 +1,12 @@
-# App result certification and queries
+# Execution result certification
 
-**The App certifies results through direct execution-peer messages.** Its internal execution code constructs the statement and checks eligible signers. A verified f+1 certificate establishes the adopted result endpoint; local durable application remains a separate milestone.
+<a id="app-result-certification-and-queries"></a>
+
+**App result handling collects certificates; Storage validates them before durable application.** Storage checks `f+1` distinct matching signatures for direct and imported results. Alignment already reflects finalized ordering through `commit(ordered)` and does not wait for this work. Certification authorizes matching canonical application; successful durability then permits ACK.
+
+Read after [result processing](../execution/interfaces.md) and [Storage](../execution/storage.md). This case follows `Prepared`, direct signing, peer evidence and `Storage::certify` through timing, completion and failure paths.
+
+Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../overview/interfaces.md#diagram-notation) for contracts and implementation ownership.
 
 ## Result endpoint: direct execution and f+1 certification
 
@@ -8,27 +14,32 @@ The App prepares the selected result commitment before signing. Each speculative
 
 ```mermaid
 sequenceDiagram
-    participant A as Validator App
-    participant S as App storage / QMDB
+    participant A as App result processing
+    participant S as Storage
     participant P as Peer Validator App
     participant R as Result consumer
-    A->>A: Complete direct execution for exact irrevocable input and base
-    A->>S: Prepare selected effects and result commitment
-    S-->>A: Commitment with exact output / material binding
-    A->>A: Sign full statement with own direct-execution provenance
-    A->>A: Retain statement and required serving material
-    A-->>P: Signature on exact ExecutionStatement
-    P-->>A: Matching signatures or original certificate
-    A->>A: Verify full subject, epoch membership and distinct identities
-    alt At least f+1 eligible matching signatures verified
-        A->>A: Establish result certificate
-        A-->>R: Certificate plus exact input / base / result identity
-        R->>R: Verify certificate and irrevocable input-state chain
-    else Insufficient matching signatures
-        A->>A: Continue valid work and retain / request statements
+    A->>A: Retain StateChanges from accepted direct Executor job
+    A->>S: [P] Storage::submit(executed, changes)
+    S-->>A: Ok(()), retained but not durable
+    S-->>A: [P] StorageEvent::Prepared(prepared)
+    A->>A: [A] results.sign(statement, direct_evidence)
+    A->>A: Retain original statement and required serving material
+    A-->>P: wire: ExecutionAttestation(statement, signature)
+    P-->>A: wire: ExecutionAttestation or ExecutionCertificate
+    A->>A: [A] results.accept(evidence, canonical_context)
+    alt VerifiedCertificate: f+1 distinct eligible same-statement signatures
+        A-->>R: wire: ExecutionCertificate(statement, signatures)
+        R->>R: [A] results.accept(certificate, canonical_context)
+        A->>S: [P] Storage::certify(certificate)
+        S-->>A: Ok(()), admitted for verification, not durable
+        Note over A,S: Storage verifies evidence, batches persistence, then emits Committed
+    else Incomplete or context still unresolved
+        Note over A: Retain prepared work, no canonical apply or ACK
+    else Invalid evidence
+        Note over A: Reject, do not count its identity
     end
-    Note over A,S: Result certification and local durable application are separate
-    Note over A,P: Imported results receive no own direct-execution signature
+    Note over A,S: Sign before state application, then certify, apply durably and ACK
+    Note over A,P: Imported work cannot produce own direct-execution signature
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-11.svg)

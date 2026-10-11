@@ -12,7 +12,7 @@ Current native source is [6233438985d8249d2b2bc1204191d5d405652288](https://gith
 | 2. Marshal assembly | [marshal.rs](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/examples/log-multimmit/src/marshal.rs#L126) | Reuse buffered Engine, `marshal::open`, resolver bridge, supplied Relay and SchemeVerifier |
 | 3. Application callbacks | [application/actor.rs](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/examples/log-multimmit/src/application/actor.rs#L70) | Replace synthetic body construction/checks with App pool and validity; register scheduling independently of execution completion |
 | 4. Engine startup | [engine/mod.rs](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/engine/mod.rs#L446) | Service recovery `verify` callbacks during open; then start planes and await readiness |
-| 5. Ordered input | [Update](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/types.rs#L128) | Retain canonical input and ACK, select/reuse/repair execution, durably apply, acknowledge |
+| 5. Ordered input | [Update](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/types.rs#L128) | Retain input/ACK, notify Alignment of ordering, execute/reuse/repair, verify f+1, durably apply, acknowledge |
 | 6. Native policy boundary | [LeaderBlock](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/types/block.rs#L802), [Marshal order](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/protocol/order.rs) | Full Baton needs authenticated policy construction/validation/continuation/recovery; callbacks alone do not provide it |
 
 ### Body assembly to implement
@@ -61,7 +61,7 @@ For checkpoint bootstrap, `Start::Floor` only seeds a fresh namespace and requir
 
 ### Baton confirmed-order assembly
 
-Use Marshal's existing canonical `Update` stream for both PreCut and Baton. Marshal already implements the body/proof backfill, native order reconstruction, catalog and ACK cursor previously assigned to a proposed Baton Orderer. App's confirmed handler reconciles the scheduler and owns application-state apply. [Ordered input](../consensus/ordered-input.md).
+Use Marshal's existing canonical `Update` stream for both PreCut and Baton. Marshal already implements the body/proof backfill, native order reconstruction, catalog and ACK cursor previously assigned to a proposed Baton Orderer. App's retained-input handler notifies Alignment of ordering; Executor computes in memory; App result handling collects evidence; Storage validates it, applies durably and supplies a usable checkpoint back to Executor. [Ordered input](../consensus/ordered-input.md).
 
 The native extension for full Baton is narrower and still unresolved: prepared policy must be bound to the actual leader proposal and interpreted identically by native validation/recovery and Marshal. Sorting output Updates locally is invalid. [Policy TODO](../consensus/decisions.md#todo-bind-baton-prefix-and-policy-to-cut-proposals).
 
@@ -77,7 +77,7 @@ Use QMDB primitives beneath App's state backend. Transaction execution produces 
 |---|---|---|
 | 1 | Assemble existing Multimmit/Marshal with the App's body type and callback handles | Actual body custody, relay, native startup/recovery and ordered delivery |
 | 2 | Add App-owned pool and deterministic transaction execution/backend | Bounded admission/selection, state effects and linked durable applied identity |
-| 3 | Add App `Reporter<Update>` handling | Exact order, replay idempotence, ACK only after durable apply, lossless delivery window |
+| 3 | Add App `Reporter<Update>` handling | Exact order, replay idempotence, ACK only after certified durable apply, signing units compatible with delivery capacity |
 | 4 | Implement independent PreCut scheduler inside App | Pending-only sorting, exact-parent speculative reuse/repair, no Baton instance or traffic |
 | 5 | Implement Baton scheduler report/direction work inside App | Authenticated report contexts, snapshot closure and completed bounded selection without blocking cut or confirmed processing |
 | 6 | Implement native authenticated Baton policy extension | Proposal binding, pre-vote validation, inclusion/leading-order preservation, continuation and Marshal recovery |

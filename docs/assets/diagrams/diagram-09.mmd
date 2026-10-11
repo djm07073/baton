@@ -1,25 +1,51 @@
 sequenceDiagram
-    participant Q as App execution owner
-    participant W as App execution workers
-    participant S as App storage / QMDB
-    Q->>W: Dispatch eligible block on exact completed parent
-    W->>S: Obtain valid branch access
-    S-->>W: Working state access / batch
-    W->>W: Compute transaction effects and outputs
-    W-->>Q: Completed result bound to parent, input and runtime
-    Note over W,S: Roots can be deferred until a selected result needs one
-    Q->>Q: Reconcile a confirmed Update against speculative path
-    Q->>W: Select matching result or repair missing suffix
-    W->>S: Prepare selected effects and result commitment
-    S-->>W: Prepared material and exact result/output binding
-    W->>S: Canonical single writer applies authorized material
-    S->>S: Persist state plus recoverable output / applied metadata linkage
-    alt Durable completion succeeds
-        S-->>W: Durable applied record
-        W->>Q: Promote path and logically prune conflicts
-        opt Retention and reference obligations permit reclamation
-            S->>S: Reclaim retained material
-        end
-    else Storage completion fails
-        Note over W,S: No ACK or durable completion, stop using failed storage and recover
+    participant A as Alignment layer / App owner
+    participant E as App Executor / workers
+    participant S as Storage
+    participant D as Existing QMDB / DatabaseSet
+    A->>A: [A] app.dispatch_ready() -> claimed Job
+    A->>E: [A] execution.execute(job)
+    E->>E: [A] execution.branch(job.parent), in-memory overlay
+    Note over E,S: Read-only base supplied by Storage, guarded by exact checkpoint identity
+    E->>E: Read current and parent memory overlays first
+    opt Cold key absent from overlays, not a tombstone
+        E->>S: [P] Storage::read(job.base_view, key)
+        S-->>E: Ok(Some(value)) / Ok(None) / Err(StorageError)
     end
+    E->>E: Transaction computation and in-memory writes
+    E-->>A: ExecutionOutcome(job_id, StateChanges)
+    A->>A: [A] app.finish_job(job_id, outcome)
+    Note over A,D: Rootless-parent replay or overlay remains App integration work
+    A->>E: [A] execution.reconcile(input, canonical_base)
+    E-->>A: StateChanges for selected canonical input
+    A->>S: [P] Storage::submit(executed, changes)
+    S-->>A: Ok(()), retained but not durable
+    Note over A,E: Executor continues from memory, Storage chooses flush timing
+    S->>D: [C] new_batches().await or fork_batches(sealed_parent)
+    D-->>S: Concrete unmerkleized batches owned by Storage
+    S->>S: Materialize exact Executor effects under storage access fence
+    S->>D: [C] concrete_batch.merkleize().await
+    D-->>S: Sealed component batches / selected commitments
+    S-->>A: [P] StorageEvent::Prepared(prepared)
+    A->>A: [A] App result path obtains certificate evidence
+
+    A->>S: [P] Storage::certify(certificate)
+    S-->>A: Ok(()), admitted for verification, not durable
+    S->>S: Verify f+1, subject, material and predecessor, authorize whole prefix
+    alt Rejected before mutation
+        S-->>A: [P] StorageEvent::Failed(failure), no ACK
+    else Certificate, material and predecessor checks pass
+        Note over S,D: Storage may batch successive certified units without changing signed history
+        S->>D: [C] DatabaseSet::apply(sealed).await
+        S->>D: [C] DatabaseSet::finalize().await
+        D-->>S: Barrier
+        S->>D: [C] barrier.durable().await
+        alt true and App metadata plus certificate evidence recoverable
+            S-->>A: [P] StorageEvent::Committed(applied)
+            A->>A: [A] app.publish_applied(applied)
+            A->>E: [A] execution.install_checkpoint(applied.checkpoint)
+        else Failed / closed durability or mutation failure
+            Note over A,D: No ACK, stop using failed mutable store and recover
+        end
+    end
+    Note over S,D: QMDB durability alone is not atomic App outputs / applied-index linkage

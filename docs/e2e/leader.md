@@ -1,41 +1,49 @@
-# Leader reports, direction, and proposal races
+# Leader reports and proposal races
 
-**Baton is one scheduler mode inside the App.** It gathers signed intended orders and prepares advisory direction while native consensus proceeds. Its report handling, bounded planning and worker dispatch are internal App operations; no public Baton or Executor trait is required.
+<a id="leader-reports-direction-and-proposal-races"></a>
+
+**Baton is one scheduler mode inside the App.** It gathers signed intended orders and prepares advisory direction while native consensus proceeds. The sequences explain policy behavior and its interaction with consensus; private methods and worker decomposition are implementation choices.
+
+Read after [Alignment policy](../baton/direction.md). This case follows report/direction messages and the explicitly unresolved native policy hooks through timing, completion and failure paths.
+
+Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../overview/interfaces.md#diagram-notation) for contracts and implementation ownership.
 
 ## Leader lifecycle: collect reports and disseminate direction
+
+External callers use `Alignment::admit/commit`; shared internal dispatch uses `AlignmentPolicy::next`. Report collection and direction selection below are behavior owned by `BatonAlignment`, not additional SDK methods to implement. The diagram does not prescribe private function names or separate planning workers.
 
 The report protocol below remains application work. Native leader-window context and authenticated proposal-policy adoption additionally require the [unfinished native extension](../consensus/decisions.md). Producer `Automaton::propose` and `verify` are not leader-cut callbacks.
 
 ```mermaid
 sequenceDiagram
-    participant N as Native leader context / proposed policy integration
-    participant L as Leader App / Baton scheduler
-    participant V as Validator App / Baton scheduler
-    participant P as App bounded planning task
-    par Report collection and planning
-        N-->>L: Exact leader window context through proposed integration
-        L-->>V: Authenticated window announcement
-        loop Valid reports before snapshot closure
-            V->>V: Preserve started prefix F and sort eligible pending
-            V-->>L: Signed intended order for exact context
-            L->>L: Validate and admit each identity at most once
+    participant N as Native proposal owner
+    participant L as Leader BatonAlignment
+    participant V as Validator BatonAlignment
+    par App report window
+        N-->>L: [X] leader_context() -> LeaderContext
+        L->>L: [A] Fix window context and deadline
+        L-->>V: wire: WindowAnnouncement(context, deadline)
+        loop Valid reports admitted before closure
+            V->>V: [A] Snapshot intended order from F and pending
+            V-->>L: wire: SignedReport(context, intended_order)
+            L->>L: [A] Authenticate and retain distinct report
         end
-        L->>L: Close once at first 4f+1 admissions or fixed deadline
-        alt No reports admitted
-            L->>L: No prepared candidate from empty snapshot
-        else Nonempty report snapshot
-            L->>P: Frozen original reports and bounded admissible candidate set
-            P-->>L: Completed evaluation or unfinished result
-            opt Valid evaluated direction prepared
-                L-->>V: Authenticated advisory direction
-                V->>V: Validate and update permitted scheduling decisions
+        L->>L: [A] Freeze snapshot at threshold or deadline
+        alt Empty frozen snapshot
+            Note over L,N: No prepared direction, valid native base before adoption
+        else Nonempty FrozenReports
+            L->>L: [A] Evaluate directions within the fixed budget
+            opt Current, valid PreparedDirection
+                L-->>V: wire: SignedDirection(context, order)
+                V->>V: [A] Validate direction and permitted pending changes
             end
         end
-        Note over L,V: No direction vote / ACK / Ready quorum
-    and Native cut
-        N->>N: Continue native proposal processing
-        Note over N,L: Never wait for report count, deadline or planning
+    and Independent native cut
+        N->>N: Native construction and voting
+        Note over N,L: Never await report count, deadline, planning or direction ACK
     end
+    Note over L,V: Internal processing, no additional SDK methods
+    Note over L,V: Wire schemas are App design placeholders, no Ready quorum
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-06.svg)
@@ -52,30 +60,31 @@ This is the **required future integration flow**, not an API present in current 
 
 ```mermaid
 sequenceDiagram
-    participant A as App Baton scheduler
-    participant P as App planning task
-    participant N as Native leader proposal owner
+    participant A as BatonAlignment
+    participant N as Native proposal owner
     participant V as Native validators
-    A->>P: Frozen nonempty report snapshot and exact context
-    alt Complete candidate is ready before proposal freeze
-        P-->>A: Prepared policy candidate
-        A-->>N: Candidate through future proposal-policy integration
-        N->>N: Recheck actual parent, history, frontier and admissibility
-        alt Valid and adoptable in actual proposal context
-            N->>N: Freeze selected prefix and interpretation in signed subject
-        else Recheck fails before adoption
-            N->>N: Use valid actual-parent native base
+    A->>A: [A] Evaluate frozen reports within budget
+    alt Evaluation completes before proposal freeze
+        opt Still-current prepared candidate
+            A-->>N: [X] offer_policy(prepared)
         end
-    else No valid prepared candidate
-        N->>N: Use valid actual-parent native base without waiting
+    else Empty snapshot, incomplete, stale or unavailable planning
+        Note over A,N: No valid prepared candidate, native cut never awaits this work
     end
-    N-->>V: Authenticated proposal with fixed interpretation
-    V->>V: Validate exact leading-prefix preservation
-    V-->>N: Native votes
-    opt Late report, completion or larger native pool
-        P-->>A: Future scheduling information
-        N->>N: Preserve this already authenticated proposal interpretation
+    N->>N: [X] adopt_policy(actual_context, ready_candidate)
+    alt Valid candidate and adoption conditions hold
+        Note over N: Freeze prefix / policy in authenticated proposal subject
+    else No valid policy before adoption
+        Note over N: Use valid actual-parent native base
     end
+    N-->>V: wire: LeaderBlock plus future authenticated policy encoding
+    V->>V: [X] validate_policy(proposal, actual_context)
+    V-->>N: wire: Native votes only after native / policy validation
+    opt Later report or planning completion
+        Note over A: Keep the result bound to its original context
+        Note over N,V: Already adopted interpretation cannot change or revert to base
+    end
+    Note over N,V: X calls are missing design obligations, not existing callable APIs
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-12.svg)

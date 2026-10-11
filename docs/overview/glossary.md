@@ -12,7 +12,9 @@
 | App TxPool | Validate/admit, retain selected/unselected candidates, select bounded bodies, reconcile canonical transaction outcomes |
 | App Pre-cut scheduler | Admit eligible pre-cut candidates, preserve started prefix and sort pending work, reconcile finalized input |
 | App Baton scheduler | The same local scheduling foundation plus intended-order reports, bounded direction selection and advisory handling |
-| App execution/storage code | Execute exact parent-linked work, prepare selected roots, certify results, import verified peer material, and apply through one durable canonical writer |
+| App Executor | Compute transaction effects and manage in-memory checkpoints; read pinned cold state, submit StateChanges with exact ordered-range metadata and install committed checkpoints |
+| Storage | Own storage preparation, certificate verification, persistence, import/recovery and usable durable checkpoint views |
+| App result processing | Sign accepted direct work with prepared commitments and collect peer certificate evidence |
 
 The scheduler mode is chosen for the application configuration. Pre-cut has no Baton instance, report windows, direction messages or native prefix-policy modification. Both modes use the same body, pool, execution backend and storage resources. The concrete global comparator, scheduler resource limits and backend remain open.
 
@@ -35,9 +37,15 @@ Engine [derives Validator when the configured scheme's `me()` returns a particip
 | Prepared policy candidate | Completed bounded planning result for possible future native authenticated adoption; current native policy integration is missing |
 | `Update` | Marshal's complete finalized block with canonical `OutputIndex` and `Exact` acknowledgement |
 | Execution checkpoint | Completed work for an exact base state, ordered prefix and runtime; reusable only under the same context |
-| Execution result | Computed changes and outputs with provenance; a root may be deferred and canonical durability is not implied |
-| Applied record | App's durable state/output/applied-index/block-identity/provenance linkage |
-| Delivery ACK | Local completion signal issued after durable application; Marshal persists its cursor separately |
+| StateChanges | Executor-to-storage payload of deterministic application changes; job/context is bound by App, while storage roots/batches/checkpoints are built by Storage |
+| AppliedCheckpoint | Storage-supplied exact certified durable prefix and usable read-only state view; Executor installs it to skip covered work |
+| `Alignment::commit(ordered)` | Notification of exact finalized ordering; no execution, f+1 or state-durability wait |
+| `Storage::read(view, key)` | Cold read at a pinned exact base after Executor overlays miss; unavailable view and I/O failure are errors |
+| `Storage::submit(executed, changes)` | Accepted exact ordered execution progress; retention is not durable commit or permission to prune memory |
+| `Storage::certify(certificate)` | Result-processing input to Storage for independent f+1 evidence verification; acceptance is not durable completion |
+| `StorageEvent::Prepared / Committed` | Ready commitments for signing / certified durable state with a usable checkpoint; only Committed permits covered Update ACKs |
+| Applied record | App's certified durable state/output/applied-index/block-identity/certificate/provenance linkage |
+| Delivery ACK | Local completion signal after matching f+1 certification and durable state application; Marshal persists its cursor separately |
 | Execution statement / result certificate | Full exact input/base/runtime/result subject / f+1 eligible distinct signatures on that same subject |
 
 A producer lane's header parent is distinct from an execution predecessor across lanes. The body digest, header digest, leader proposal identity, canonical output index and application state root identify different facts. A native [`View`](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/types.rs#L257) counts consensus attempts within one epoch, producer height counts blocks in one lane, and Marshal's [`OutputIndex`](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/types.rs#L53) counts blocks in the finalized output stream. An integer output index alone is not a state root or a cryptographic block identity.
@@ -51,7 +59,7 @@ The immutable ordering frontier ends the input prefix that future direction cann
 |---|---|
 | BlockService / body custody adapter | Existing Multimmit Marshal plus App body codec and validity logic |
 | Orderer / Baton confirmed delivery | Existing Multimmit Marshal for ordinary native order |
-| Public TxPool / Executor / Storage / Baton traits | Concrete App-internal pool, work, persistence and scheduling code |
+| Earlier broad TxPool / Executor / Storage / Baton traits | Concrete pool/execution code; proposed Alignment and internal AlignmentPolicy for scheduling; Storage read/submit/certify with retained events for state access and persistence |
 | Planner / ResultService / Runtime | Internal bounded planning, result handling and transaction computation; Commonware runtime still supplies task/I/O primitives |
 | StoredBody / CandidateBlock events | Internal retained custody and eligibility facts; no mandatory new public event API |
 | Executor::commit / CommitResult | Internal processing of Marshal Update through the App canonical writer and durable applied record |

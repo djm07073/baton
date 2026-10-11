@@ -1,22 +1,39 @@
 sequenceDiagram
-    participant O as Startup owner
+    participant O as Node owner
     participant M as Multimmit Marshal
-    participant A as App
-    participant S as App storage / QMDB
-    O->>S: Recover state, outputs, applied position and provenance
-    S-->>A: Authoritative durable applied record
-    O->>M: Reopen catalog, bodies and delivery cursor
-    M->>M: Recover / fetch missing native history and blocks
-    M-->>A: Redeliver Update after durable Marshal cursor
-    A->>A: Check exact index and block against applied record
-    alt Same input already durably applied
-        A-->>M: Acknowledge without duplicate effects
-    else Next unapplied input
-        A->>A: Reuse or execute from recovered canonical base
-        A->>S: Apply and persist exact result / metadata
-        S-->>A: Durable completion
-        A-->>M: Acknowledge
-    else Identity conflict or gap
-        A->>A: Stop advancement and reconcile / recover
+    participant A as Alignment layer / App owner
+    participant E as App Executor
+    participant S as Storage
+    O->>S: [A] state.recover(config)
+    S-->>A: [P] StorageEvent::Committed(recovered), exact prefix and pinned StateView
+    A->>E: [A] execution.install_checkpoint(recovered.checkpoint)
+    Note over A,E: Skip the recovered prefix, do not recreate its execution
+    O->>M: [C] marshal::open(...) then Service::start(..., app_output)
+    Note over O,M: Existing catalog, custody, order and delivery cursor recovery
+    M->>A: [C] Reporter::report(redelivered Update)
+    A->>A: [A] app.retain_update(update)
+    A->>A: [P] Alignment::commit(ordered), idempotent continuous ordering
+    A-->>M: Feedback: retained
+    A->>A: [A] app.apply_next()
+    alt Exact index / identity covered by certified durable state
+        Note over A,S: Recover and verify retained certificate linkage
+        A-->>M: [C] update.acknowledgement.acknowledge()
+    else Next continuous unapplied input
+        A->>E: [A] execution.reconcile(input, recovered_base)
+        E-->>A: StateChanges
+        A->>S: [P] Storage::submit(executed, changes)
+        S-->>A: Ok(()), retained but not durable
+        S-->>A: [P] StorageEvent::Prepared(prepared)
+        A->>A: [A] App result path obtains certificate evidence
+        Note over A,S: Missing certificate stays pending, no state apply or ACK
+        A->>S: [P] Storage::certify(certificate)
+        S-->>A: Ok(()), admitted for verification, not durable
+        S->>S: Verify f+1, subject, material and current base, apply durably
+        S-->>A: [P] StorageEvent::Committed(applied)
+        A->>A: [A] app.publish_applied(applied)
+        A->>E: [A] execution.install_checkpoint(applied.checkpoint)
+        A-->>M: [C] update.acknowledgement.acknowledge()
+    else Identity conflict, gap or apply failure
+        Note over A,S: Stop advancement, retain exact input for recovery, no ACK
     end
-    M->>M: Persist acknowledged continuous prefix
+    M->>M: Existing acknowledged-prefix cursor sync

@@ -1,6 +1,12 @@
-# Startup, restart, and history recovery
+# Startup, restart and recovery
 
-**Start body custody and the App callback path before opening native Multimmit.** Native recovery can call `Automaton::verify` from `Engine::open`. Marshal separately restores its finalized output and delivery cursor, while the App restores its durable state and applied identity.
+<a id="startup-restart-and-history-recovery"></a>
+
+**Start body custody and the App callback path before opening native Multimmit.** Native recovery can call `Automaton::verify` from `Engine::open`. Marshal separately restores its finalized output and delivery cursor, while App restores certified durable state, applied identity and certificate evidence. Configured genesis remains the initial trust anchor; every subsequent applied unit needs recoverable certification evidence.
+
+Read after [App coordination](../baton/README.md), [Marshal delivery](../consensus/ordered-input.md) and [Storage](../execution/storage.md). This case follows startup calls, recovered checkpoint handoff and idempotent Update replay through timing, completion and failure paths.
+
+Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../overview/interfaces.md#diagram-notation) for contracts and implementation ownership.
 
 ## Startup: prepare custody before native recovery
 
@@ -8,33 +14,58 @@ For a fresh deployment, initialize the configured deterministic App genesis stat
 
 ```mermaid
 sequenceDiagram
-    participant O as Node assembly
-    participant W as Commonware network
+    participant O as Node assembly / owner
+    participant W as Existing network
     participant M as Marshal / buffer / resolver
-    participant A as App
+    participant A as Alignment layer / App owner
     participant N as Multimmit Engine
-    O->>W: Register native 4 planes plus Marshal broadcast / resolver
-    O->>W: Start network
-    O->>A: Create Automaton and Update reporter handles
-    O->>M: Open service with existing buffered mailbox
-    O->>M: Start resolver bridge, verifier and delivery to App
-    O->>A: Start App with Marshal mailbox, recover applied state
-    O->>N: Engine::open(Config with Automaton, Relay, native Reporter)
-    N->>N: Recover native durable state
-    loop Required recovered payloads
-        N->>A: Automaton::verify(recovered Context, body digest)
-        A->>M: Establish exact valid durable custody
-        M-->>A: Retained complete block
-        A-->>N: Verification receiver resolves true
+    participant E as App Executor
+    participant S as Storage
+    O->>W: [C] network.register(channel, quota)
+    O->>W: [C] network.start()
+    O->>A: [A] app.open(config) -> callback handles
+    A->>S: [A] state.recover(config), or configured genesis
+    S-->>A: [P] StorageEvent::Committed(recovered), checkpoint with pinned StateView
+    A->>E: [A] execution.install_checkpoint(recovered.checkpoint)
+    Note over O,A: Retained Update ingress exists now, speculative lifecycle stays recovering
+    O->>M: [C] buffered::Engine::new(runtime, config)
+    M-->>O: broadcast_engine, buffer
+    O->>M: [C] broadcast_engine.start(transport.broadcast)
+    O->>M: [C] marshal::open(runtime, config, buffer).await
+    M-->>O: Service, BackfillBridge
+    O->>M: [C] resolver::Engine::new(runtime, config_with_bridge)
+    M-->>O: resolver_engine, resolver_mailbox
+    O->>M: [C] resolver_engine.start(transport.resolver)
+    O->>M: [C] service.relay(local_chain)
+    M-->>O: Relay
+    O->>M: [C] service.start(resolver_mailbox, verifier, app_output)
+    M-->>O: Mailbox, ServiceHandle
+    O->>A: [A] app.start(mailbox.clone())
+    Note over M,A: Early Updates are retained, custody processing is ready before Engine open
+    O->>N: [C] Engine::open(runtime, config).await
+    loop Required recovery custody checks
+        N->>A: [C] Automaton::verify(ctx, body_digest).await
+        A-->>N: Receiver[bool]
+        A->>M: [C] subscribe_block(reference).await
+        M-->>A: Ok(full_block): durable custody
+        A->>A: [A] app.check_payload(ctx, full_block) -> PayloadVerdict
+        A-->>N: verdict_reply.send(true) only for valid payload and custody
     end
-    N->>N: Wire native actors
-    N-->>O: Opened Engine
-    O->>N: start(Planes)
-    N-->>O: Running handle
-    O->>N: running.ready().await
-    N-->>O: Ok(()) or Stopped error
-    A->>A: On ready success and valid App base, re-evaluate candidates and schedule
-    Note over A,N: Native custody checks do not require speculative transaction execution
+    N-->>O: Opened Engine or open error
+    alt Open failed
+        Note over O,N: Stop startup attempt
+    else Engine opened
+        O->>N: [C] engine.start(planes)
+        N-->>O: Running
+        O->>N: [C] running.ready().await
+        alt Stopped
+            Note over O,N: Stop startup attempt
+        else Ok and App base consistent
+            O->>A: [A] app.activate(native_ready, recovered_base)
+            A->>A: [A] app.dispatch_ready()
+        end
+    end
+    Note over O,N: Failures stop this startup attempt, ready is not ongoing health or App durability
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-13.svg)
@@ -55,27 +86,44 @@ A task handle, native ready milestone, or cancelled worker does not establish st
 
 ```mermaid
 sequenceDiagram
-    participant O as Startup owner
+    participant O as Node owner
     participant M as Multimmit Marshal
-    participant A as App
-    participant S as App storage / QMDB
-    O->>S: Recover state, outputs, applied position and provenance
-    S-->>A: Authoritative durable applied record
-    O->>M: Reopen catalog, bodies and delivery cursor
-    M->>M: Recover / fetch missing native history and blocks
-    M-->>A: Redeliver Update after durable Marshal cursor
-    A->>A: Check exact index and block against applied record
-    alt Same input already durably applied
-        A-->>M: Acknowledge without duplicate effects
-    else Next unapplied input
-        A->>A: Reuse or execute from recovered canonical base
-        A->>S: Apply and persist exact result / metadata
-        S-->>A: Durable completion
-        A-->>M: Acknowledge
-    else Identity conflict or gap
-        A->>A: Stop advancement and reconcile / recover
+    participant A as Alignment layer / App owner
+    participant E as App Executor
+    participant S as Storage
+    O->>S: [A] state.recover(config)
+    S-->>A: [P] StorageEvent::Committed(recovered), exact prefix and pinned StateView
+    A->>E: [A] execution.install_checkpoint(recovered.checkpoint)
+    Note over A,E: Skip the recovered prefix, do not recreate its execution
+    O->>M: [C] marshal::open(...) then Service::start(..., app_output)
+    Note over O,M: Existing catalog, custody, order and delivery cursor recovery
+    M->>A: [C] Reporter::report(redelivered Update)
+    A->>A: [A] app.retain_update(update)
+    A->>A: [P] Alignment::commit(ordered), idempotent continuous ordering
+    A-->>M: Feedback: retained
+    A->>A: [A] app.apply_next()
+    alt Exact index / identity covered by certified durable state
+        Note over A,S: Recover and verify retained certificate linkage
+        A-->>M: [C] update.acknowledgement.acknowledge()
+    else Next continuous unapplied input
+        A->>E: [A] execution.reconcile(input, recovered_base)
+        E-->>A: StateChanges
+        A->>S: [P] Storage::submit(executed, changes)
+        S-->>A: Ok(()), retained but not durable
+        S-->>A: [P] StorageEvent::Prepared(prepared)
+        A->>A: [A] App result path obtains certificate evidence
+        Note over A,S: Missing certificate stays pending, no state apply or ACK
+        A->>S: [P] Storage::certify(certificate)
+        S-->>A: Ok(()), admitted for verification, not durable
+        S->>S: Verify f+1, subject, material and current base, apply durably
+        S-->>A: [P] StorageEvent::Committed(applied)
+        A->>A: [A] app.publish_applied(applied)
+        A->>E: [A] execution.install_checkpoint(applied.checkpoint)
+        A-->>M: [C] update.acknowledgement.acknowledge()
+    else Identity conflict, gap or apply failure
+        Note over A,S: Stop advancement, retain exact input for recovery, no ACK
     end
-    M->>M: Persist acknowledged continuous prefix
+    M->>M: Existing acknowledged-prefix cursor sync
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-10.svg)

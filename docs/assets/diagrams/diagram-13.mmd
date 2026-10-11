@@ -1,28 +1,53 @@
 sequenceDiagram
-    participant O as Node assembly
-    participant W as Commonware network
+    participant O as Node assembly / owner
+    participant W as Existing network
     participant M as Marshal / buffer / resolver
-    participant A as App
+    participant A as Alignment layer / App owner
     participant N as Multimmit Engine
-    O->>W: Register native 4 planes plus Marshal broadcast / resolver
-    O->>W: Start network
-    O->>A: Create Automaton and Update reporter handles
-    O->>M: Open service with existing buffered mailbox
-    O->>M: Start resolver bridge, verifier and delivery to App
-    O->>A: Start App with Marshal mailbox, recover applied state
-    O->>N: Engine::open(Config with Automaton, Relay, native Reporter)
-    N->>N: Recover native durable state
-    loop Required recovered payloads
-        N->>A: Automaton::verify(recovered Context, body digest)
-        A->>M: Establish exact valid durable custody
-        M-->>A: Retained complete block
-        A-->>N: Verification receiver resolves true
+    participant E as App Executor
+    participant S as Storage
+    O->>W: [C] network.register(channel, quota)
+    O->>W: [C] network.start()
+    O->>A: [A] app.open(config) -> callback handles
+    A->>S: [A] state.recover(config), or configured genesis
+    S-->>A: [P] StorageEvent::Committed(recovered), checkpoint with pinned StateView
+    A->>E: [A] execution.install_checkpoint(recovered.checkpoint)
+    Note over O,A: Retained Update ingress exists now, speculative lifecycle stays recovering
+    O->>M: [C] buffered::Engine::new(runtime, config)
+    M-->>O: broadcast_engine, buffer
+    O->>M: [C] broadcast_engine.start(transport.broadcast)
+    O->>M: [C] marshal::open(runtime, config, buffer).await
+    M-->>O: Service, BackfillBridge
+    O->>M: [C] resolver::Engine::new(runtime, config_with_bridge)
+    M-->>O: resolver_engine, resolver_mailbox
+    O->>M: [C] resolver_engine.start(transport.resolver)
+    O->>M: [C] service.relay(local_chain)
+    M-->>O: Relay
+    O->>M: [C] service.start(resolver_mailbox, verifier, app_output)
+    M-->>O: Mailbox, ServiceHandle
+    O->>A: [A] app.start(mailbox.clone())
+    Note over M,A: Early Updates are retained, custody processing is ready before Engine open
+    O->>N: [C] Engine::open(runtime, config).await
+    loop Required recovery custody checks
+        N->>A: [C] Automaton::verify(ctx, body_digest).await
+        A-->>N: Receiver[bool]
+        A->>M: [C] subscribe_block(reference).await
+        M-->>A: Ok(full_block): durable custody
+        A->>A: [A] app.check_payload(ctx, full_block) -> PayloadVerdict
+        A-->>N: verdict_reply.send(true) only for valid payload and custody
     end
-    N->>N: Wire native actors
-    N-->>O: Opened Engine
-    O->>N: start(Planes)
-    N-->>O: Running handle
-    O->>N: running.ready().await
-    N-->>O: Ok(()) or Stopped error
-    A->>A: On ready success and valid App base, re-evaluate candidates and schedule
-    Note over A,N: Native custody checks do not require speculative transaction execution
+    N-->>O: Opened Engine or open error
+    alt Open failed
+        Note over O,N: Stop startup attempt
+    else Engine opened
+        O->>N: [C] engine.start(planes)
+        N-->>O: Running
+        O->>N: [C] running.ready().await
+        alt Stopped
+            Note over O,N: Stop startup attempt
+        else Ok and App base consistent
+            O->>A: [A] app.activate(native_ready, recovered_base)
+            A->>A: [A] app.dispatch_ready()
+        end
+    end
+    Note over O,N: Failures stop this startup attempt, ready is not ongoing health or App durability

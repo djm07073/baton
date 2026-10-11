@@ -1,6 +1,12 @@
-# P2P and message paths
+# P2P: channels and messages
+
+<a id="p2p-and-message-paths"></a>
 
 **Reuse one Commonware network and the existing Multimmit/Marshal channels.** App transaction, report/direction and execution-result messages can use additional logical channels on that network. They need no second networking stack.
+
+## Responsibility and communication
+
+Commonware transport supplies authenticated peer connections and registered channels. Multimmit and Marshal own native message handling; App ingress, Baton policy and result processing validate their own message content. Transport receipt establishes neither transaction admission, final ordering nor certified durability.
 
 ## P2P connections and message planes
 
@@ -39,3 +45,25 @@ Follow the [existing Marshal assembly](https://github.com/0xEyrie/monorepo/blob/
 Provide usable App body access before `Engine::open` can issue recovered verify requests. Keep native and Marshal resolver channels distinct; application execution readiness must not create a cycle in native custody recovery. [Startup sequence](../e2e/recovery.md#startup-prepare-custody-before-native-recovery)
 
 Bound complete encoded messages and outstanding requests/subscriptions, not only mailbox item count. Application result signers are the authenticated epoch identities in the exact signed subject, not arbitrary connected peers. Concrete wire formats, numerical budgets, transaction propagation and result transport remain open.
+
+## Messages used in diagrams
+
+`wire:` labels describe peer-message content, not trait methods. Existing native artifacts retain their native codecs. The App names below are logical contracts; they do not declare new Rust structs or settle their wire encoding.
+
+| Diagram label | Contract / definition |
+|---|---|
+| `Transaction(tx)` | Bounded transaction input admitted under the [pool contract](../tx/interfaces.md); transport receipt is not admission or inclusion. |
+| `WindowAnnouncement(context, deadline)` | Baton report-window context and fixed closure deadline under the [report rules](../baton/direction.md); authentication and exact context checks are required. |
+| `SignedReport(context, intended_order)` | Original authenticated intended-order report, counted once per eligible identity in the fixed window; not execution evidence. |
+| `SignedDirection(context, order)` | Authenticated advisory direction under the same context; [pending-order rules](../e2e/reschedule.md) constrain adoption. It does not establish native finality. |
+| `ExecutionAttestation(statement, signature)` | Original eligible validator signature over the exact direct-execution subject under [result certification](../execution/interfaces.md#result-certification-inside-executor). |
+| `ExecutionCertificate(statement, signatures)` | Matching full subject and distinct eligible `f+1` evidence; Storage verifies it independently before state application. |
+| `MaterialRequest(verified_target)` / `StateMaterial(target, data, outputs)` | Request and applicable state/output material bound to the same certified target under [state sync](../execution/state-sync.md); a certificate alone is not material. |
+| `TransactionBlock` / `SignedTransactionBlock` | Existing complete block / signed producer-header artifacts; [body exchange](../consensus/block-body.md) explains their independent paths. |
+| DA vote/certificate, `LeaderBlock`, native votes and proof artifacts | Existing [native protocol messages](../consensus/README.md), not App execution-result certificates. Future policy encoding in diagram 12 remains an unresolved native extension. |
+
+The generic internal dispatch wakeup and `StorageEvent` use local App communication. They are not peer wire formats. Execution/material traffic on the PreCut overview denotes the execution-result rows above; native broadcast/backfill traffic denotes the existing native/Marshal planes.
+
+## Continue with E2E flows
+
+The component pages establish ownership and communication contracts. Start [Transaction to durable state](../e2e/normal.md) to follow those connections in time: pool selection, native custody, Alignment admission, Executor work, ordered Update, result certification, Storage durability and ACK. The later cases expand one part of that same flow, including failure and recovery.

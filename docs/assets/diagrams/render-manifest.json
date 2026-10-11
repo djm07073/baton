@@ -1,140 +1,140 @@
 {
   "specification": "Baton docs Mermaid sources",
-  "specification_sha256": "93ed277ea84f668e25d8e80082f0a0f24bbd9082682129d1464ab341f0ed13fc",
+  "specification_sha256": "e119a0fd58293cf7b1faafbd8d283f2430f72fd9cf490865b2b37c52ed3f4546",
   "renderer": "mermaid 11.12.0",
   "diagrams": [
     {
       "name": "diagram-01",
       "title": "Application composition",
-      "width": 1121,
-      "height": 860,
-      "source_sha256": "4cccb5900950a59a6eb0fb2c6b5059f43c63ca1f3f9d76297c7491997014ba0c"
+      "width": 2122,
+      "height": 1022,
+      "source_sha256": "7762aba5b46dd2fd689bf3ef89a0daa397f8997f20cf2d0fe7d80b8c4885106d"
     },
     {
       "name": "diagram-02",
       "title": "Full E2E: transaction input to canonical state",
-      "width": 1340,
-      "height": 2308,
-      "source_sha256": "f6c7f08007baf90d25aeb88c8362f6a37f59b4dd533b21ab33e0d05bb1ab7959"
+      "width": 1551,
+      "height": 3211,
+      "source_sha256": "246bd208e3b7aba7b53d4c8cf08ab341991eea2b4cc1f828f7803323f86fc891"
     },
     {
       "name": "diagram-03",
       "title": "Tx lifecycle: new, duplicate, and invalid transactions",
-      "width": 903,
-      "height": 1335,
-      "source_sha256": "7edac75252ba257a225f1239b0ccfcb0471161e28c00417424eda0a1951e2a94"
+      "width": 927,
+      "height": 1380,
+      "source_sha256": "adf698a3aeea0da50365ac55d61728b5c688ad8b86b6b5db06a2a78e3cad3b72"
     },
     {
       "name": "diagram-04",
-      "title": "Block lifecycle: mempool \u2192 propose \u2192 body dissemination",
-      "width": 1318,
-      "height": 1284,
-      "source_sha256": "548b6713fafd206b3e7dc974483ba8ce3b596abf0ed666dcdef4481af0abfe34"
+      "title": "Block lifecycle: mempool → propose → body dissemination",
+      "width": 1348,
+      "height": 1578,
+      "source_sha256": "2cbf2f5a7e3cc0d2ec5855c9f5152b6302a4717151308c03300d9d337166e8fa"
     },
     {
       "name": "diagram-05",
       "title": "Body lookup, verification, and missing-content handling",
-      "width": 936,
-      "height": 1722,
-      "source_sha256": "1ee145d1bd4af6ec403e7cb2e118e53617b196644e3413943e5126b0c2db3ae5"
+      "width": 915,
+      "height": 2578,
+      "source_sha256": "564205d1e42b0e61e9b7633d3d770642b8dd139e6621efa4f6714789aaf12b43"
     },
     {
       "name": "diagram-06",
       "title": "Leader lifecycle: collect reports and disseminate direction",
-      "width": 907,
-      "height": 1702,
-      "source_sha256": "5e1e662bb14cdb9bf9d236666757ba420695686f6c28947c73543c4508269a92"
+      "width": 741,
+      "height": 1884,
+      "source_sha256": "23972fd85bec691a5151f255c39d752be7e075f39cc7d76880757e3dccbfefbc"
     },
     {
       "name": "diagram-07",
       "title": "Non-leader lifecycle: direction and branch execution",
       "width": 930,
-      "height": 1434,
-      "source_sha256": "d43f7acdd1200148a2732ab51200c5ce16ba3b26a1786a72bd7f0f21a7f57b36"
+      "height": 1908,
+      "source_sha256": "0fdfe8b3439a3998938d184089766fff6efc53d55f73948df2b7580bf59dadf8"
     },
     {
       "name": "diagram-08",
-      "title": "Cut commit \u2192 ordered range \u2192 execution commit",
-      "width": 1115,
-      "height": 1885,
-      "source_sha256": "448ba6fbbf1d027ee50b11ae4808c9ebd2d0f7859cf9320843aec6794813e012"
+      "title": "Native finality → ordered delivery → durable App application",
+      "width": 1143,
+      "height": 2598,
+      "source_sha256": "33ac5feba555b8db7c160f9b92d7317bb7edc2888bc3f88f8f158adcdda476b8"
     },
     {
       "name": "diagram-09",
       "title": "Execution lifecycle: QMDB branches and canonical promotion",
-      "width": 711,
-      "height": 1657,
-      "source_sha256": "2a97b332bb1f283b1c2cfd4c059208241c92491fd282f551fa730e4af48e3595"
+      "width": 951,
+      "height": 3165,
+      "source_sha256": "eefd34a9a2dce8f26225bdf358aa689ef9de5717108ee1bfbc9b5c8b1cc2e18b"
     },
     {
       "name": "diagram-10",
       "title": "Restart and backfill",
-      "width": 899,
-      "height": 1371,
-      "source_sha256": "7745aa14633bf27e1a23eda15046003557e717d9cee8f57eddef8f15d446ad0a"
+      "width": 1149,
+      "height": 2409,
+      "source_sha256": "7c5bdb85db5111e828b63737e5e703a5588d5d7aafd9ecf5713c3dc2b68163a2"
     },
     {
       "name": "diagram-11",
       "title": "Result endpoint: direct execution and f+1 certification",
-      "width": 919,
-      "height": 1524,
-      "source_sha256": "b70ebf5aa2eef3b51dd1d6524d2ce76e2c541f29989615d4f01aae485ceaa5d7"
+      "width": 932,
+      "height": 1749,
+      "source_sha256": "6d9b508864e92c632653ace746f7cc69dcec86f2e560e75c5b822106e7011a2d"
     },
     {
       "name": "diagram-12",
       "title": "Planning completion versus proposal freeze",
-      "width": 899,
-      "height": 1668,
-      "source_sha256": "3de613e1dc6f6abd1187f6839cd6ea96e32af5a708b2314ee703527936ab1d7c"
+      "width": 709,
+      "height": 1707,
+      "source_sha256": "d9d0d0f20e252fe8415d9922994d9726eeb21d1f9cb928809a3946282864a1f2"
     },
     {
       "name": "diagram-13",
       "title": "Startup: prepare custody before native recovery",
-      "width": 1116,
-      "height": 1476,
-      "source_sha256": "162a663505ea78d3f613dcece4343030ce39bd608007e3dedfd91af601bc4e5b"
+      "width": 1553,
+      "height": 2462,
+      "source_sha256": "b6bbe0e3544b8b7079aee616e767f589ee6a99d7904707fbdd2a9872ac3f3b0a"
     },
     {
       "name": "diagram-14",
       "title": "State sync from certified execution results",
-      "width": 902,
-      "height": 2067,
-      "source_sha256": "34997c1e65dfb438df51a882fb450cf6989f9fa38f61bb6bc17eb95ce04d28b1"
+      "width": 1131,
+      "height": 2350,
+      "source_sha256": "0a0d71325c32beabb65bd5a287e855de0b9414f1d5e3cdfffd93429a69a4ef7d"
     },
     {
       "name": "diagram-15",
-      "title": "Normal native consensus: producer DA \u2192 leader proposal \u2192 finality",
-      "width": 1359,
-      "height": 1644,
-      "source_sha256": "3d466afb3814aa3c6f529ecc0aca16620b57db92f137093c77488fe9bc275153"
+      "title": "Native producer, DA and view/finality paths",
+      "width": 1355,
+      "height": 1791,
+      "source_sha256": "7a30042757425c6b1034ca94d615a285b5c110bc040c1323609e93c4ce2a4c23"
     },
     {
       "name": "diagram-16",
       "title": "Native actors and source layout",
-      "width": 1136,
-      "height": 634,
-      "source_sha256": "a7f83ccaeb26a512441bb5b6fad8abb0843c4b0a6c7b701b267328e48dbbcf49"
+      "width": 1317,
+      "height": 706,
+      "source_sha256": "c92383213dafb3c01e055eaafa8596b6a3489eb0f98df3ca84c95dbf25da9e92"
     },
     {
       "name": "diagram-17",
       "title": "QMDB state and reuse boundaries",
-      "width": 1200,
-      "height": 1036,
-      "source_sha256": "9509437e5770b6b0b6773bd68e46b701e19e4f70064500b61515258c60881e2e"
+      "width": 1601,
+      "height": 1124,
+      "source_sha256": "6d4beac2d4033a4d7e6bb2f52eaf9346b32bd9b03d3c69f8a2c54a0dec0ffdc1"
     },
     {
       "name": "diagram-18",
       "title": "Manage the branch tree for execution requests",
-      "width": 934,
+      "width": 1598,
       "height": 280,
-      "source_sha256": "82eab17ca3a0bbae7cced8305ccb9d5208af9d26326cfa7fc5376577927880ac"
+      "source_sha256": "f5527459c341f3c4b4c09f87eb849188e13b422334c5a49bdfdb6ad7e944f24b"
     },
     {
       "name": "diagram-19",
-      "title": "Pre-cut execution without Baton",
-      "width": 1599,
-      "height": 908,
-      "source_sha256": "d6b8572c5edc3dbd19d305ed01152bad038337548468f03068e6456b71b5a70e"
+      "title": "Architecture and responsibilities",
+      "width": 1682,
+      "height": 748,
+      "source_sha256": "954bfcfd9377a9ee268f15e56a89d3c6892a972c1cc6310f24271413b4260615"
     }
   ],
   "origin_snapshot_sha256": "79d5a7109a685d8b8c968bcc92b135fad290a70dc62a8c95f064128c919ff74b",

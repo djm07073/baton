@@ -1,25 +1,31 @@
 sequenceDiagram
-    participant L as Leader App / Baton scheduler
-    participant A as Local App / Baton scheduler
-    participant M as Multimmit Marshal
-    participant W as App execution workers
-    L-->>A: Direction bound to exact context and intended order
-    A->>A: Verify leader, epoch, view, parent, frontier and freshness
-    alt Invalid or stale context
-        A->>A: Discard advisory update
-    else Valid direction
-        A->>A: Check compatibility with immutable and started work
-        alt Direction needs an unresolved conflict policy
-            A->>A: Keep current valid path, no adopted override is implied
-        else Permitted pending scheduling change
-            A->>M: Resolve exact required blocks through existing APIs
-            alt Body or exact execution parent unavailable
-                A->>A: Keep pending and retain dependencies
-            else Candidate and parent ready
-                A->>W: Internal dispatch with exact parent / input / runtime
-                W->>W: Reuse matching child or execute transaction effects
-                W-->>A: Completed result for that exact path
+    participant L as Peer BatonAlignment
+    participant B as Local BatonAlignment
+    participant A as Alignment internal dispatch / App owner
+    participant E as App Executor
+    L-->>B: wire: SignedDirection(context, intended_order)
+    B->>B: [A] Validate direction context and pending-order change
+    alt Invalid or stale
+        Note over B: Reject without changing valid current work
+    else Started-prefix conflict with no adopted override policy
+        Note over B: Defer, the conflict policy remains open
+    else Permitted pending-order change
+        B-->>A: [A] Coalesced dispatch wakeup, no payload
+        A->>A: [A] app.dispatch_ready()
+        A->>B: [P] AlignmentPolicy::next(current_view), crate-internal
+        B-->>A: JobIntent or None
+        alt None
+            Note over A: Wait for eligible input, ready parent or capacity
+        else JobIntent available
+            A->>A: Recheck current view, claim attempt and reserve resources
+            alt Claim failed or intent stale
+                Note over A: Refresh view, do not launch
+            else Claimed Job recorded before launch
+                A->>E: [A] execution.execute(job)
+                E-->>A: ExecutionOutcome(job_id, StateChanges)
+                A->>A: [A] app.finish_job(job_id, outcome)
             end
         end
     end
-    Note over L,A: No direction approval or execution-completion round
+    Note over B,A: Both are Alignment internals, external calls use Alignment::admit / commit
+    Note over A,E: Missing blocks follow the body/candidate flow before becoming eligible

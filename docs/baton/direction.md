@@ -1,6 +1,21 @@
-# Pre-cut and Baton scheduling inside App
+# Alignment: Pre-cut and Baton
+
+<a id="pre-cut-and-baton-scheduling-inside-app"></a>
 
 **Both schedulers consume usable blocks and the same canonical Marshal Updates. Pre-cut starts local work early. Baton additionally exchanges intended orders and chooses advisory direction.** Execution workers, checkpoints, storage, result certification and state sync belong to the same application in both modes.
+
+## Responsibilities and communication interfaces
+
+Alignment owns eligible candidates and pending scheduling policy. It preserves started order `F`, records finalized ordering and selects work from the execution view. The App owner claims/dispatches the selected work; Executor owns checkpoints and Storage owns persistence.
+
+| Direction | Call or message | Completion means |
+|---|---|---|
+| App candidate intake → Alignment | `Alignment::admit(candidate)` | Candidate admitted, deduplicated or deferred; no execution starts here |
+| App ordered-input owner → Alignment | `Alignment::commit(ordered)` | Continuous finalized ordering reflected; no execution, certification or durability wait |
+| App dispatch → policy | Internal `AlignmentPolicy::next(view)` → `Option<JobIntent>` | A proposed block/parent pair or no eligible work; resources remain unclaimed |
+| Peer Apps ↔ Baton policy | Window announcement, signed reports and signed direction | Authenticated scheduling information; no ordering finality or execution certificate |
+
+The [shared Alignment contract](../overview/interfaces.md#proposed-alignment-interface) defines method results, view contents and invariants. The [message catalog](../overview/networking.md#messages-used-in-diagrams) describes peer content. PreCutAlignment and BatonAlignment share the traits; Baton-specific report/planning functions remain private.
 
 ## Shared application state and different scheduling policy
 
@@ -25,7 +40,7 @@ intended_order = F ++ sort_G(S_pending)
 
 `F`, `G` and `S_pending` are explanatory notation. They do not require public Rust types or a `GlobalRule` trait. Required producer ancestry/dependencies still hold. Comparator, deterministic tie-break and rule identity remain open; arrival time is not the tie-break.
 
-| Arrival with G = A → B → C | Scheduler action |
+| Arrival with G = A → B → C | Alignment action |
 |---|---|
 | A is executing; C becomes eligible | Keep F = A, pending = C |
 | B becomes eligible before C starts | Sort pending to B → C; leave A running |
@@ -40,7 +55,7 @@ The local started prefix is not canonical. A later continuous Marshal Update can
 
 Both schedulers use the same [canonical Update worker](interfaces.md#marshal-reportupdate-canonical-input-and-ack). Compare retained work with the exact canonical predecessor, ordered prefix, input state and runtime. A matching block digest alone is insufficient, and a producer-header parent is not the merged execution parent. Missing required bodies or state keep work pending; they do not create empty inputs.
 
-The shared worker reuses valid work or finishes/repairs the canonical path, fences incompatible workers and live database access, and durably applies before ACK. After application, advance App's canonical base once, remove applied pending entries and rebase/fence conflicting work. Retain compatible descendants only within the resource and retention budget. Reports and direction add no approval step.
+Alignment records the exact finalized order through `commit(ordered)` immediately. App Executor independently reuses or repairs that path in memory. Storage verifies its matching `f+1` certificate and applies durably, then supplies a usable checkpoint back to Executor. Installation advances the execution base, skips covered inputs and retires conflicting work; ACK remains tied to certified durability. Retain compatible descendants only within the resource and retention budget. Reports and direction add no approval step.
 
 ## Leader: choose direction from reports
 

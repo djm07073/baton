@@ -1,4 +1,6 @@
-# Transaction pool inside the application
+# Pool backend survey
+
+<a id="transaction-pool-inside-the-application"></a>
 
 **The application owns its transaction pool and reads it in `Automaton::propose`.** The pool retains candidates, supplies a bounded batch for the requested producer context, and receives internal maintenance after durable canonical application. `admit` and `select` describe concrete app operations; they do not require a new public TxPool trait or a separate BlockService.
 
@@ -35,6 +37,22 @@ None of these references supplies an unchanged Multimmit pool lifecycle. Produce
 Tempo demonstrates body-side immutable payment classification and encoded-size checks while keeping its existing pool/iterator composition. Its execution-dependent wrappers and body execution builder remain workload-specific references. Constantinople's selection instead pops whole batches and stops a lane when its head exceeds the remaining tx-byte budget; post-pop policy filtering still needs the selected material-retention/reconciliation contract. [Tempo payload classification](https://github.com/tempoxyz/tempo/blob/61c979a524f9af5de9c540a0088c429a44741e4c/crates/payload/builder/src/lib.rs#L590), [Encoded-size filter](https://github.com/tempoxyz/tempo/blob/61c979a524f9af5de9c540a0088c429a44741e4c/crates/payload/builder/src/lib.rs#L616), [Whole-batch selection](https://github.com/commonwarexyz/constantinople/blob/3b6c92e76bf582855615844a4175b8304808f6a9/crates/mempool/src/webserver/actor.rs#L406).
 
 Names alone are not proof of reusable behavior. Alto constructs opaque test payloads without a pool. The separate `zmanian/commonware-mempool` demonstration has stub Relay/Verify paths and emits a message called FinalizedBlock from proposal construction; that event cannot drive canonical cleanup. These inspected sources are useful survey evidence, not selected Baton backends. [Alto builder](https://github.com/commonwarexyz/alto/blob/1d87569348b5560699465a72d691d90f18affb9c/chain/src/application.rs#L51), [demo proposal path](https://github.com/zmanian/commonware-mempool/blob/a80b86e22a74322cf4c29b07973f00711dbc4373/src/mempool.rs#L416).
+
+## Backend operation mapping
+
+Reuse one fitting candidate store and its deduplication/selection machinery. Keep app-specific classification in its existing admission paths.
+
+| Candidate | Existing operations | App connection still required |
+|---|---|---|
+| Nunchi | `submit`, `pending(count)`, `finalized` | SHA-256/nonce-lane fit, classification in both local and peer ingress, byte packing, canonical nonce hydration and lost-update reconciliation |
+| Reth | `add_transaction`, dependency-aware best iterator, canonical maintenance | Ethereum transaction/provider semantics and complete canonical outcome mapping |
+| Constantinople | Admission, bounded foreground/background queues, batch selection | Fixed transaction/context types, destructive selection retention/cancellation, canonical lifecycle and source-version adaptation |
+
+Nunchi's private pool kernel can be adapted through its existing Message/handle/handler. Its lossy `finalized` notification does not establish processing; startup and lost-update reconciliation remain necessary. Its limited pending walk can underfill after filtering, and a selected successor cannot bypass an excluded required predecessor. [Nunchi handle](https://github.com/nunchi-labs/sdk/blob/eea35ced709f68c15d6fbc8bcc754696a7e44374/mempool/src/actor.rs#L61), [pending walk](https://github.com/nunchi-labs/sdk/blob/eea35ced709f68c15d6fbc8bcc754696a7e44374/mempool/src/pool.rs#L160).
+
+Constantinople pops selected candidates; retain bytes and reconcile canceled proposals if adapting it to the app's selection contract. Reth's local iterator exclusion is separate from mined canonical cleanup; use its full canonical maintenance when that backend is selected. These are source-adaptation candidates, with unverified compatibility to the current Multimmit graph. [Constantinople selection](https://github.com/commonwarexyz/constantinople/blob/3b6c92e76bf582855615844a4175b8304808f6a9/crates/mempool/src/webserver/actor.rs#L402), [Reth maintenance API](https://github.com/paradigmxyz/reth/blob/038edab20dfff017f7a7502e683c732e5628ad89/crates/transaction-pool/src/traits.rs#L773).
+
+Backend choice, transaction codec/identity, duplicate semantics, static policy, quotas and physical retention remain open. The [detailed survey](#reuse-an-existing-pool-without-importing-the-wrong-lifecycle) retains the detailed source fit and limits.
 
 ## Nunchi whole-actor connection
 

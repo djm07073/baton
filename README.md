@@ -1,6 +1,6 @@
 # Baton
 
-Read and edit the implementation design in **[Baton Docs](docs/README.md)**. The [table of contents](docs/SUMMARY.md) organizes the pages by application responsibility, E2E case and benchmark baseline. The integration starts with one App connected to the existing Multimmit Engine and Marshal.
+Read and edit the implementation design in **[Baton Docs](docs/README.md)**. The [table of contents](docs/SUMMARY.md) follows overview → component responsibilities and communication → E2E flows → reference material. The integration starts with one App connected to the existing Multimmit Engine and Marshal.
 
 | Start here | Covers |
 |---|---|

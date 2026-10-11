@@ -1,8 +1,14 @@
-# Block proposal, DA, and cut finality
+# Native proposal, DA and finality
+
+<a id="block-proposal-da-and-cut-finality"></a>
 
 **Multimmit owns native signing, voting and finality.** The App provides payloads and validity/custody verdicts. Marshal consumes native activity to retain and deliver the ordinary finalized total order.
 
 <a id="normal-native-consensus-producer-da--leader-proposal--finality"></a>
+
+Read after [Multimmit](../consensus/README.md) and [Marshal delivery](../consensus/ordered-input.md). This case follows Automaton, native Activity and the final Update handoff through timing, completion and failure paths.
+
+Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../overview/interfaces.md#diagram-notation) for contracts and implementation ownership.
 
 ## Native producer, DA and view/finality paths
 
@@ -14,30 +20,31 @@ sequenceDiagram
     participant A as Producer App
     participant V as Validator native owner
     participant B as Validator App
-    participant L as Native leader / view owner
+    participant L as Native view / finality owner
     participant M as Multimmit Marshal
-    P->>A: Automaton::propose(Context)
-    A-->>P: Body digest through proposal receiver
-    P->>A: Automaton::verify(Context, body digest)
-    A-->>P: Valid durable custody through true verdict
-    P->>P: Sign producer header
-    P-->>V: Signed header on native data plane
-    V->>V: Native authentication and eligibility checks
-    V->>B: Automaton::verify(Context, body digest)
-    B-->>V: Valid durable custody through true verdict
-    par Application speculation
-        B->>B: Eligible candidate enters App scheduler
+    P->>A: [C] Automaton::propose(ctx).await
+    A-->>P: Receiver[BodyDigest], later digest_reply.send(body_digest)
+    P->>A: [C] Automaton::verify(ctx, body_digest).await
+    A-->>P: Receiver[bool], later verdict_reply.send(true)
+    P->>P: Existing local custody fence and header signing
+    P-->>V: wire: SignedTransactionBlock(header, attestation)
+    V->>V: Native authentication and eligibility
+    V->>B: [C] Automaton::verify(ctx, body_digest).await
+    B-->>V: Receiver[bool], later true after valid durable custody
+    par App speculation
+        B->>B: [A] app.admit_candidate(candidate)
+        B->>B: [A] app.dispatch_ready() when exact parent / resources ready
     and Native DA
-        V->>V: Continue DA path and native durability gates
-        V-->>P: DA vote
-        P-->>V: DA certificate when native threshold is met
+        V->>V: Existing DA and native persistence checks
+        V-->>P: wire: DA vote
+        P-->>V: wire: DA certificate at native threshold
     and Native view / finality
-        Note over P,L: DA certificate assembly and leader proposal progress are independent, native eligibility still applies
-        L-->>V: Native leader proposal and required parent evidence
-        V-->>L: Broadcast native votes to peers (L included)
-        L->>L: Native finality / extension processing
-        L-->>M: Reporter::report(Activity)
-        M->>M: Existing history interpretation and ordered body delivery
+        Note over P,L: DA certificate assembly and leader progress are independent, native eligibility still applies
+        L-->>V: wire: LeaderBlock and required parent evidence
+        V-->>L: wire: Native votes to peers including leader
+        L->>L: Existing finality and extension processing
+        L->>M: [C] Reporter::report(Activity)
+        Note over M: Existing history / body / order reconstruction feeds App Update reporter
     end
 ```
 

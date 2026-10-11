@@ -1,0 +1,57 @@
+{
+  "checked_at": "2026-10-11T11:05:20.977923+00:00",
+  "native_pin": "6233438985d8249d2b2bc1204191d5d405652288",
+  "scope": "Files consulted for existing callback, body-reference, assembly and state-operation names. Byte identity does not prove application integration correctness.",
+  "files": [
+    {
+      "path": "consensus/src/lib.rs",
+      "sha256": "10ee4b31e18bb0ceeebdfac3128290f5b6b0f6a46d647d07429335ac0dcd39f9",
+      "matches_native_pin": true
+    },
+    {
+      "path": "consensus/src/multimmit/types/block.rs",
+      "sha256": "10f0eaae1519052669c1311a3975598ff30ed8628ce22bff0f300abf6230b3e7",
+      "matches_native_pin": true
+    },
+    {
+      "path": "consensus/src/multimmit/engine/mod.rs",
+      "sha256": "f846af7ff5bd290c087cc6c676cb473ecab6cb936d8f2c15c493c27fb47818a7",
+      "matches_native_pin": true
+    },
+    {
+      "path": "consensus/src/multimmit/marshal/service/mod.rs",
+      "sha256": "c21ce05466dbd4d9ecabf67b0f14d2829f54b9fd7c945bee129ae20270e7bd97",
+      "matches_native_pin": true
+    },
+    {
+      "path": "consensus/src/multimmit/marshal/mailbox.rs",
+      "sha256": "b81299e900e9f37d0dea1e60c700cd02b9c4a7c2202cecfc15b7f04813d0a4c7",
+      "matches_native_pin": true
+    },
+    {
+      "path": "consensus/src/multimmit/marshal/types.rs",
+      "sha256": "f5fb70336398760dbfba256736d460d5544204677b9bc3e84fe57c3ce07388bd",
+      "matches_native_pin": true
+    },
+    {
+      "path": "glue/src/stateful/db/mod.rs",
+      "sha256": "1f3d8c538efcb717868a0911280d34e6ebae65912c9ba49df98731045e1d614d",
+      "matches_native_pin": true
+    },
+    {
+      "path": "p2p/src/authenticated/lookup/network.rs",
+      "sha256": "85f5b7c4ce68cf580653df0833cce436fb2a501b7b3e290c5c053741fbe8788f",
+      "matches_native_pin": true
+    },
+    {
+      "path": "examples/log-multimmit/src/marshal.rs",
+      "sha256": "1f4fe669d2883fd3508b59929e1bc52136c9f7619dc2eb12d745df62dfb02d87",
+      "matches_native_pin": true
+    },
+    {
+      "path": "examples/log-multimmit/src/node.rs",
+      "sha256": "74f3f522b8b3777add05e44bdfdb62164b46c72f8000ecd33d2637c35200dfae",
+      "matches_native_pin": true
+    }
+  ]
+}

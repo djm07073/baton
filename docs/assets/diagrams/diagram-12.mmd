@@ -1,25 +1,26 @@
 sequenceDiagram
-    participant A as App Baton scheduler
-    participant P as App planning task
-    participant N as Native leader proposal owner
+    participant A as BatonAlignment
+    participant N as Native proposal owner
     participant V as Native validators
-    A->>P: Frozen nonempty report snapshot and exact context
-    alt Complete candidate is ready before proposal freeze
-        P-->>A: Prepared policy candidate
-        A-->>N: Candidate through future proposal-policy integration
-        N->>N: Recheck actual parent, history, frontier and admissibility
-        alt Valid and adoptable in actual proposal context
-            N->>N: Freeze selected prefix and interpretation in signed subject
-        else Recheck fails before adoption
-            N->>N: Use valid actual-parent native base
+    A->>A: [A] Evaluate frozen reports within budget
+    alt Evaluation completes before proposal freeze
+        opt Still-current prepared candidate
+            A-->>N: [X] offer_policy(prepared)
         end
-    else No valid prepared candidate
-        N->>N: Use valid actual-parent native base without waiting
+    else Empty snapshot, incomplete, stale or unavailable planning
+        Note over A,N: No valid prepared candidate, native cut never awaits this work
     end
-    N-->>V: Authenticated proposal with fixed interpretation
-    V->>V: Validate exact leading-prefix preservation
-    V-->>N: Native votes
-    opt Late report, completion or larger native pool
-        P-->>A: Future scheduling information
-        N->>N: Preserve this already authenticated proposal interpretation
+    N->>N: [X] adopt_policy(actual_context, ready_candidate)
+    alt Valid candidate and adoption conditions hold
+        Note over N: Freeze prefix / policy in authenticated proposal subject
+    else No valid policy before adoption
+        Note over N: Use valid actual-parent native base
     end
+    N-->>V: wire: LeaderBlock plus future authenticated policy encoding
+    V->>V: [X] validate_policy(proposal, actual_context)
+    V-->>N: wire: Native votes only after native / policy validation
+    opt Later report or planning completion
+        Note over A: Keep the result bound to its original context
+        Note over N,V: Already adopted interpretation cannot change or revert to base
+    end
+    Note over N,V: X calls are missing design obligations, not existing callable APIs

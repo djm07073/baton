@@ -40,7 +40,7 @@ async function main() {
       const rendered=await mermaid.render(id,source);
       document.querySelector('#diagram').innerHTML=rendered.svg;
       await document.fonts.ready;
-      return rendered.svg;
+      return new XMLSerializer().serializeToString(document.querySelector('#diagram svg'));
     };
     </script>`;
   const server = http.createServer(async (request, response) => {

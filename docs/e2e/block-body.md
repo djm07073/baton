@@ -1,35 +1,49 @@
-# Block body send, fetch, and receive
+# Block publication and retrieval
+
+<a id="block-body-send-fetch-and-receive"></a>
 
 **Use the existing Multimmit Marshal for complete-block custody and exchange.** The App defines the transaction body codec, digest and validity checks. Native Multimmit handles signed producer headers, DA and ordering; the body travels through Marshal's buffered broadcast and backfill services.
 
+Read after [Marshal custody](../consensus/block-body.md) and [App callbacks](../baton/interfaces.md). This case follows `stage_block`, `Relay::broadcast`, `subscribe_block/fetch_block` and the verification reply through timing, completion and failure paths.
+
+Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../overview/interfaces.md#diagram-notation) for contracts and implementation ownership.
+
 ## Block lifecycle: mempool → propose → body dissemination
+
+This is the successful local proposal path; the next diagram expands validation, pending data and custody failure.
 
 ```mermaid
 sequenceDiagram
     participant N as Native producer
-    participant A as App Automaton
-    participant P as App TxPool
+    participant A as Alignment layer / Automaton
+    participant P as App pool / payload
     participant M as Multimmit Marshal
-    participant B as Buffered broadcast
+    participant B as Existing buffered transport
     participant R as Peer node
-    N->>A: propose(producer Context)
-    A->>P: Select retained transactions within limits
-    P-->>A: Candidate batch
-    A->>A: Build complete block from body and Context
-    A->>M: stage_block(complete block)
-    M-->>A: Custody token for accepted storage work
-    A-->>N: Proposal receiver resolves to body digest
-    N->>A: verify(Context, body digest), local custody check
-    A->>M: subscribe_block(exact BlockRef) or await retained custody
-    M-->>A: Durable custody established
-    A->>A: Check expected header/body and payload validity
-    A-->>N: Verification receiver resolves true
-    N->>N: Sign producer header
-    N->>M: Relay::broadcast(header digest, ())
-    M->>B: Broadcast staged complete block
-    B-->>R: Header and body together
-    N-->>R: Signed header through separate native data plane
-    Note over N,R: Separate channels may deliver in either order
+    N->>A: [C] Automaton::propose(ctx).await
+    A-->>N: Receiver[BodyDigest]
+    A->>P: [A] pool.select(ctx, limits)
+    P-->>A: RetainedBatch
+    A->>A: [C] TransactionBlock::from_context(ctx, body)
+    A->>M: [C] stage_block(block).await
+    M-->>A: Ok(Custody)
+    A-->>N: digest_reply.send(body_digest)
+    N->>A: [C] Automaton::verify(ctx, body_digest).await
+    A-->>N: Receiver[bool]
+    A->>M: [C] subscribe_block(reference).await
+    M-->>A: Ok(full_block): durable custody
+    Note over A,M: A retained Custody.wait() or put_block() can establish the same fence
+    A->>P: [A] app.check_payload(ctx, full_block)
+    P-->>A: PayloadVerdict::Valid
+    A->>A: [A] app.admit_candidate(candidate)
+    A-->>N: verdict_reply.send(true)
+    N->>N: Native signing after successful local custody
+    N->>M: [C] Relay::broadcast(header_digest, ())
+    M-->>N: Feedback: local broadcast submission, not peer receipt
+    M->>B: Existing staged-block broadcast
+    B-->>R: wire: TransactionBlock(header, body)
+    N-->>R: wire: SignedTransactionBlock(header, attestation)
+    Note over N,R: Independent channels, arrival order is not guaranteed
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-04.svg)
@@ -42,35 +56,50 @@ The body digest commits to the payload. The header digest identifies the native 
 
 ```mermaid
 sequenceDiagram
-    participant N as Native engine
-    participant A as App Automaton
+    participant N as Multimmit Engine
+    participant A as Alignment layer / Automaton
     participant M as Multimmit Marshal
-    participant Q as App scheduler
-    N->>A: verify(Context, body digest)
-    A->>A: Derive exact header and BlockRef
-    A->>M: subscribe_block(BlockRef)
-    Note over A,M: Waits for durable local / buffered custody, no explicit peer fetch
-    opt Concurrent active retrieval if required
-        A->>M: fetch_block(BlockRef)
-        M->>M: Existing resolver / peer backfill
+    participant E as App Executor / workers
+    N->>A: [C] Automaton::verify(ctx, body_digest).await
+    A-->>N: Receiver[bool]
+    A->>A: [C] ctx.header(body_digest) -> header
+    A->>A: [C] header.block_ref() -> exact BlockRef
+    A->>M: [C] subscribe_block(reference).await
+    opt Explicit retrieval needed, concurrent with subscription
+        A->>M: [C] fetch_block(reference).await
+        Note over A,M: Fetch may return buffered bytes, it does not prove durable custody
     end
-    alt Required exact block still unavailable
-        Note over N,A: Keep verdict pending while the condition may change
-    else Expected block available
-        M-->>A: subscribe_block resolves with durable complete block
-        A->>A: Check context, digest and application payload validity
-        alt Expected payload permanently invalid
-            A-->>N: Verification receiver resolves false
-        else Valid payload with durable custody
-            A->>A: Deduplicate and retain validated candidate facts
-            A-->>N: Verification receiver resolves true
-            opt Live candidate has required authentication / ancestry
-                A->>Q: Internal eligible pending admission
-                Q->>Q: Sort pending, dispatch only with exact parent ready
+    alt Required data or dependency still missing
+        Note over N,A: Keep verdict pending until a verdict or native cancellation
+    else Exact block available
+        M-->>A: full_block (subscription or fetch result)
+        A->>A: [A] app.check_payload(ctx, full_block) -> PayloadVerdict
+        alt PayloadVerdict::Invalid
+            A-->>N: verdict_reply.send(false)
+        else PayloadVerdict::Pending
+            Note over N,A: Retain live request, do not return false
+        else PayloadVerdict::Valid
+            opt Fetch won and durable custody not yet established
+                A->>M: [C] put_block(full_block).await
+                M-->>A: Ok(()) or custody error
+                Note over A,M: On success retire superseded subscription, no redundant put after successful subscription
+            end
+            alt Custody failed
+                Note over N,A: No true verdict, stop failed local storage path and recover
+            else Durable custody established
+                A->>A: [A] app.admit_candidate(candidate)
+                A-->>N: verdict_reply.send(true)
+                opt Eligible live Job with ready parent and resources
+                    A->>A: [A] app.dispatch_ready() -> claimed Job
+                    A->>E: [A] execution.execute(job)
+                    E-->>A: ExecutionOutcome(job_id, StateChanges)
+                    A->>A: [A] app.finish_job(job_id, outcome)
+                end
             end
         end
     end
-    Note over A,Q: Speculative execution completion does not gate verify
+    Note over N,A: Remote, local pre-sign and recovery calls share this interface
+    Note over A,E: Custody errors never become true, execution completion does not gate verify
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-05.svg)

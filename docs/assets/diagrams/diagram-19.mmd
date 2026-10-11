@@ -1,18 +1,16 @@
 flowchart TB
-    N[Native Multimmit] -->|propose / verify| I
-    N -->|Activity| M[Existing Multimmit Marshal]
-    M -->|ordered Update and ACK token| I
-    subgraph A[PreCut]
-        T[Transaction pool] -->|selected txs for propose| I[Existing callback handles]
-        I -->|eligible candidate after valid custody| Q[PreCut: sort pending only]
-        Q -->|exact-parent work| E[Shared execution tree / transaction backend]
-        I -->|canonical index and block| E
-        E --> S[Shared selected-root and durable application path]
-        S -->|durable outcomes| T
+    N["Multimmit Engine"] -->|"[C] Automaton::propose / verify"| I
+    N -->|"[C] Reporter::report(Activity)"| M["Multimmit Marshal"]
+    subgraph A["PreCut inside App"]
+        I["Alignment layer callback handles"] -->|"[A] pool.select / pool.reconcile"| T["App pool"]
+        I <-->|"[P] Alignment::admit / commit<br/>AlignmentPolicy::next (internal)"| Q["PreCutAlignment"]
+        I <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges"| E["App Executor: workers and checkpoints"]
+        I <-->|"[P] Storage::submit / certify<br/>StorageEvent::Prepared / Committed"| S["Storage<br/>reads, f+1 and persistence"]
+        I -->|"[A] execution.install_checkpoint"| E
+        E <-->|"[P] Storage::read(view, key)<br/>cold state at pinned base"| S
     end
-    I -->|stage / subscribe / fetch| M
-    S -->|ACK after durable apply| M
-    E <-->|execution certificates / verified state material| P[Peer applications]
+    I <-->|"[C] custody / ACK to Marshal<br/>report(Update) to App"| M
+    I <--->|"wire: execution evidence / state material"| P["Peer Apps"]
     classDef reuse fill:#dbeafe,stroke:#2563eb,color:#172554;
     classDef fresh fill:#dcfce7,stroke:#16a34a,color:#14532d;
     class N,M reuse;

@@ -1,8 +1,22 @@
-# Application callbacks and scheduler behavior
+# App: native callbacks
+
+<a id="application-callbacks-and-scheduler-behavior"></a>
 
 <a id="interface-overview"></a>
 
-**Keep `Automaton` unchanged. Implement its payload callbacks and Marshal's delivery `Reporter` on handles into App.** The [Rust interface reference](../overview/rust-interfaces.md) lists the existing signatures; the handler names in pseudocode below are illustrative private functions, not proposed traits or native APIs.
+**App callback handles receive payload requests from Multimmit and ordered input from Marshal.** They retain request/input identity and hand long work to bounded jobs while the shared App owner handles other events. The [Rust reference](../overview/rust-interfaces.md) contains existing signatures; private handler names below describe their behavior.
+
+## Communication interfaces
+
+| Direction | Interface | Completion means |
+|---|---|---|
+| Multimmit → App | `Automaton::propose(ctx)` | Returned receiver later resolves to a staged body's digest |
+| Multimmit → App | `Automaton::verify(ctx, body_digest)` | Returned receiver later resolves validity/custody, independently of speculative execution |
+| Marshal → App | `Reporter::report(Update)` | Synchronous retention of indexed input and its token; ACK follows certified durable application |
+
+The sections below expand each handler's ownership, waits and failure paths.
+
+The [interface map](../overview/interfaces.md) gives the shared call names, inputs/results and implementation owners used by the E2E Mermaid diagrams. The pseudocode here expands those contracts; it does not require an additional set of methods.
 
 Cloned callback handles route to the same App state. For `propose` and `verify`, return the receiver promptly and run the pending request work shown below as bounded async jobs. Body/custody waits leave the App owner free to handle intake and completions; completed jobs re-enter that owner before updating shared state. The [existing example mailbox](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/examples/log-multimmit/src/application/mailbox.rs#L148) uses this handoff.
 
@@ -88,42 +102,46 @@ Computation runs through Commonware runtime workers, outside the native callback
 
 ## Marshal report(Update): canonical input and ACK
 
-Marshal calls `Reporter::report` synchronously with an `Update` containing `index`, `Arc<TransactionBlock>` and `acknowledgement: Exact`. Acknowledge that exact delivery only after App has durably applied it.
+Marshal calls `Reporter::report` synchronously with an `Update` containing `index`, `Arc<TransactionBlock>` and `acknowledgement: Exact`. Acknowledge that exact delivery only after App has verified a matching `f+1` execution-result certificate and durably applied the covered input.
 
 The trusted local Marshal stream supplies the ordering authority; App checks its exact range against the recovered application checkpoint. Update is not a portable finality proof and does not carry execution state, runtime, result certificate or Baton policy. A peer-sent object with the same fields cannot substitute for this local callback. External evidence export remains a separate open contract, not a second verifier required for ordinary App delivery.
 
 ```text
 report(update):
     transfer the entire Update, including its Exact token, to App's retained inbox
+    reflect new continuous finalized ordering through Alignment::commit
     return local Feedback immediately
 
 App canonical worker:
-    take the next continuous Update index
-    if durable applied metadata already covers this exact index and identity:
-        acknowledge this redelivery; continue
-    reconcile with the canonical predecessor and ordered input
-    reuse matching completed speculative work, or finish/repair required work
-    alternatively use fully verified applicable certified peer material
-    prepare selected roots under valid database access
-    at the canonical writer, recheck the current exact predecessor
-    fence incompatible workers and live database access before mutation
-    durably apply through that writer
-    recoverably link state, outputs, applied position/identity and provenance
-    on App owner, reconcile the durable completion with current applied identity
-    advance canonical base once, or recognize that this exact input is already covered
-    schedule pool maintenance from durable outcomes
-    update.acknowledgement.acknowledge()
+    preserve the next continuous ordered unit and its exact ACK tokens
+    if recovered certified durable identity covers it, ACK replay idempotently
+    otherwise reuse/complete/repair its execution, or choose a verified peer import
+    forward exact executed range and StateChanges through Storage::submit
+    acceptance retains changes; continue execution without awaiting a flush
+    retain input on rejection, missing certification or storage failure
+
+on StorageEvent::Prepared:
+    App result handling signs direct work, collects evidence and calls Storage::certify
+
+on StorageEvent::Committed(applied):
+    reconcile the exact certified durable prefix with retained Updates
+    retain/forward applied.checkpoint so Executor skips covered input
+    refresh execution state and schedule pool maintenance from durable outcomes
+    acknowledge only the exact covered Updates
 ```
 
 An Update may be App's first encounter with the block, including for an observer or skipped speculation. Canonical processing cannot require an earlier `verify` call or scheduler entry: it performs the application checks needed for execution, or reuses exact validated work. This does not add another Automaton callback.
+
+The public [`Storage`](../overview/interfaces.md#proposed-storage-interface) contract owns certificate verification and durable application. Executor supplies StateChanges with exact executed-range metadata; Storage prepares storage commitments and App result handling collects evidence. The retained Update owner forwards the `Committed` event's checkpoint to Executor and handles ACK. Storage submission can precede certification and durability; neither acceptance alone authorizes ACK. A call into this trait never waits for Alignment approval.
 
 Do not put application execution inside `report` or return an async future from it. App can pipeline receipt and computation while preserving canonical application order. Reports/direction planning cannot approve or gate this worker. App's capacity policy must also let required custody and canonical execution, root preparation and durability make progress under sustained optional load. Speculation, report verification and planning cannot indefinitely monopolize the resources that work needs.
 
 | Event | What it proves | What can continue |
 |---|---|---|
 | `report(Update)` returns | App accepted the delivery into its retained path | Native consensus and other delivery slots |
-| App finishes matching transaction work | A result exists for the exact execution context | Root preparation, certification and application |
-| App completes durable apply and ACKs | App can recover this applied input | Marshal releases acknowledged window capacity in contiguous order |
+| App finishes matching transaction work | A result exists for the exact execution context | Root preparation and result signing; canonical apply awaits certification |
+| App verifies matching `f+1` certificate | Exact ordered input/base/result is certified | Writer may apply matching material after its authority checks |
+| App completes certified durable apply and ACKs | App can recover this applied input and certification evidence | Marshal releases acknowledged window capacity in contiguous order |
 | Marshal syncs its delivery cursor | Marshal can recover its acknowledged delivery position | Recovery from the persisted cursor and permitted pruning |
 
 Within one active delivery window, Marshal can report up to `max_pending_acks` outstanding Updates. A full window pauses further App delivery; native voting, leader finality and producer progress do not wait for these ACKs. Retain every accepted Update and its Exact token in a queue sized for that window. `Closed` terminates delivery; `Backoff` does not retry a dropped Update. Every Exact clone must acknowledge, and dropping an unacknowledged clone cancels its live waiter.
@@ -132,7 +150,7 @@ ACK is an in-memory signal after App durability. Marshal subsequently persists i
 
 For floor/import transitions, the active-window bound does not cover old Updates still retained by App after Marshal resets its window. Update has no generation field. Serialize the transition through App ownership: fence/reconcile old inputs and tokens against matching durable App state, or explicitly budget bounded overlap before accepting a fresh window. The [detailed handoff](../execution/state-sync.md#coordinate-the-app-checkpoint-with-marshal) remains implementation work.
 
-Result certification remains separate: irrevocable exact input/base/runtime plus `f+1` distinct matching execution signatures. Direct canonical work can apply while peer signatures are collected; imported material additionally needs its certificate and applicability checks. ACK is not result certification, and direction support does not authorize canonical state. [Execution result contract](../execution/interfaces.md#result-certification-inside-executor).
+Result certification precedes canonical application for both direct and imported work: irrevocable exact input/base/runtime plus `f+1` distinct matching execution signatures. While signatures are missing, retain prepared work without canonical state apply or ACK. Signing must precede application, and the next certification unit must fit the active delivery capacity. Within a unit, private execution checkpoints allow progress before application. [Execution result contract](../execution/interfaces.md#result-certification-inside-executor).
 
 <a id="finalized-state-progress-notifications"></a>
 
@@ -140,4 +158,4 @@ Result certification remains separate: irrevocable exact input/base/runtime plus
 
 Route native `Activity` directly to Marshal through its [existing mailbox reporter](../consensus/README.md#native-activities). App may additionally consume `TransactionProposed`, `ProtocolAccepted`, finality or history observations for candidate correlation and advisory scheduling. These are best-effort, idempotent hints; App must not build a second finality/delivery engine from them.
 
-Scheduler progress is ordinary App state: after canonical apply, remove applied pending entries and rebase/fence conflicting speculative work. No public `on_commit`, extra ACK protocol or scheduler approval is required. Result signatures, certificates and state-sync material travel directly between peer application execution components; Baton report collection is outside that path.
+Shared execution progress is ordinary App state: after canonical apply, remove applied pending entries and rebase/fence conflicting speculative work without calling `Alignment::commit` again. Applied-progress coordination adds no extra ACK protocol or scheduler approval. Result signatures, certificates and state-sync material travel directly between peer application execution components; Baton report collection is outside that path.

@@ -1,38 +1,62 @@
-# Execution inside the application
+# Executor: execution and checkpoints
 
-**The app owns transaction execution, its execution tree and durable state.** Its selected scheduler is either PreCut or Baton. Commonware `Automaton::propose/verify` and Marshal `Reporter<Update>` are the external entry points; they do not require public Executor or Storage traits. Names such as execution worker and storage below describe internal responsibilities and existing concrete handles.
+<a id="execution-inside-the-application"></a>
 
-Native Multimmit's internal `AppExecutor` invokes local propose/verify jobs and tracks their completion. It does not interpret transactions or supply an application execution backend. The app must implement that work. See [the callback sequence](../baton/interfaces.md) and [execution connection](interfaces.md).
+**Executor computes transactions and manages in-memory execution checkpoints.** App coordination supplies jobs and canonical input; Storage supplies pinned cold state and certified durable checkpoints. PreCut and Baton use the same Executor behavior.
+
+Native Multimmit's private `AppExecutor` runs `Automaton::propose/verify` callbacks. The App Executor described here is the transaction-computation responsibility inside App.
 
 ## Roles and responsibilities
 
-| App responsibility | Trigger | Completion condition |
-|---|---|---|
-| Speculative scheduling | Valid, durably custodied and eligible candidate | Pending order updated; execution is dispatched separately |
-| Direct execution | Scheduler selects a block and its valid exact predecessor | Completed effects/outputs associated with exact base, runtime and input prefix |
-| Canonical reconciliation | Marshal `Update { index, block, acknowledgement }` | Reuse matching work, finish/repair missing work, or select verified applicable imported material |
-| Root preparation | A selected storage/signing boundary needs a commitment | Deterministic exact-prefix material and complete result/output binding |
-| Durable application | Canonical reconciliation has valid material | One writer makes state, outputs, applied identity and direct/imported provenance recoverable |
-| Delivery completion | Matching durable application established | App signals the Update ACK; Marshal persists its own delivery cursor separately |
-| Result certification | Direct or peer result statements | Irrevocable exact input/base plus `f+1` distinct eligible matching signatures |
-| Peer state sync | Valid certificate and applicable material available | Safe handoff through the same canonical writer; imported provenance retained |
-| Pool maintenance | Applicable durable outcomes | Backend candidates/nonces/status reconciled internally |
+| Responsibility | Owned state or work |
+|---|---|
+| Execute an exact-parent job | Transaction computation and in-memory effects on the assigned valid checkpoint |
+| Retain reusable work | Checkpoints and StateChanges bound to exact input, parent, runtime and local attempt |
+| Reconcile finalized input | Reuse matching work, finish missing work or repair the differing suffix |
+| Install durable progress | Adopt Storage's usable checkpoint, skip covered input and retire conflicting attempts |
+| Release memory safely | Preserve compatible descendants and retain overlays/views while workers or references need them |
 
-The [callback contract](../baton/interfaces.md) defines candidate admission, synchronous Update retention, replay and durable ACK. Both scheduler modes use the same exact-parent execution state and canonical writer: valid speculation is reusable only for matching input, parent and runtime, and a differing canonical path needs repair. Keep started work fixed on ordinary arrival and sort only eligible pending work under [the shared scheduling rule](../baton/direction.md#global-rule-for-local-execution-and-reports).
+Alignment selects work; the App owner rechecks and claims the attempt before launch. Storage prepares roots and persists state. App result processing signs and collects evidence. The [App owner](../baton/README.md) retains Update ACK tokens and coordinates these independent completions.
+
+## Communication interfaces
+
+| Direction | Call or value | Completion means |
+|---|---|---|
+| App dispatch → Executor | `execution.execute(job)` → `ExecutionOutcome` | Exact-parent StateChanges, or failure/cancellation; no persistent write |
+| App canonical owner → Executor | `execution.reconcile(input, canonical_base)` → `StateChanges` | Effects for the required ordered unit, reusing or repairing prior work |
+| Executor → Storage | `Storage::read(view, key)` | Value or absence at the exact pinned base; unavailable views and I/O failures are errors |
+| Executor → App owner → Storage | StateChanges + bound `ExecutedRange`, then `Storage::submit` | Storage retains accepted ordered progress; Executor does not choose flush timing |
+| Storage → App owner → Executor | `StorageEvent::Committed(applied)`, then `execution.install_checkpoint(applied.checkpoint)` | Install a certified durable base and skip its covered input |
+
+`execute`, `reconcile` and `install_checkpoint` are concrete App operations described in the [communication contracts](../overview/interfaces.md#private-pool-and-execution-calls). The shared owner binds changes to accepted job metadata before submission. Storage receives StateChanges rather than an Executor memory checkpoint, root or database batch.
+
+## Exact parents and reusable work
+
+Execution jobs carry the exact input block plus the execution checkpoint selected by the scheduler. A producer's `Context.parent` identifies that lane's previous header. It cannot identify the predecessor in the merged execution sequence. The same body after different prefixes needs different execution identity. Bind completed work to canonical base, application/runtime/rule version and exact prior inputs; the concrete encoding remains open.
+
+Candidate metadata identifies the exact block; an execution attempt also identifies its chosen path and parent. A duplicate candidate notification does not launch another copy of an active attempt. Repair on a different exact parent remains distinct work.
+
+Preserve completed/current `F` and sort only pending eligible inputs. A state-dependent child starts when the valid predecessor checkpoint is ready. Missing/unfinished parents leave work pending. A new arrival does not cancel or relabel started work; a new canonical Update may require exact-parent repair. [Scheduling rule](../baton/direction.md#global-rule-for-local-execution-and-reports).
+
+## Cold reads and checkpoint installation
+
+Read current and parent overlays first, including tombstones. Only a genuine miss calls `Storage::read` against the retained base view. A failed or unavailable read never means absent data and never switches the job to a newer base. Failure/cancellation cannot produce a reusable completed checkpoint.
+
+Accept completion once for the current attempt/context/ancestry; stale results cannot attach to the execution tree. Dropping a waiter does not necessarily stop its worker. Reclaim resources only after termination or reference release makes that safe.
+
+For a durable ABC checkpoint while local work is at A, installation skips B/C and makes ABC available as the parent for later work. Check identity and read access, reject conflicting checkpoints and never rewind to an older base. Retire covered/conflicting attempts, ignore late completions and preserve compatible descendants without applying covered changes twice. Installation adds no ACK round. The [checkpoint handoff contract](../overview/interfaces.md#checkpoint-handoff-and-execution-skipping) defines the full retention rules.
 
 ## Execution effects and storage roots
 
-Use concrete QMDB batches/database handles and Commonware runtime tasks. Transaction execution produces effects and outputs; prepare roots only when useful. Root calculation must precede full-result signing, but need not run for every abandoned speculative attempt. Existing sealed-parent forks are reusable; an unsealed-parent tree is still application integration. [QMDB recipes](qmdb.md).
+Executor produces exact StateChanges on memory overlays. [Storage](storage.md) materializes selected effects into concrete QMDB batches, prepares deterministic commitments and controls physical persistence. Retain effects still needed by branches before a root-preparation operation consumes its only draft. Existing sealed-parent forks are usable; root-deferred branching needs its own App integration. See the [QMDB reference](qmdb.md).
 
-Do not require `commonware_glue::stateful::Application` or the full Stateful actor for this app. Its lifecycle is a reference; the app needs merged Multimmit input and deferred-root speculation. Its [mailbox](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/glue/src/stateful/actor/core/mailbox.rs#L8) targets the block/ancestry `commonware_consensus::Application` and Simplex Marshal `Update` contracts; Multimmit uses a different callback boundary. Concrete `glue::stateful::db` utilities can be reused independently when their selected DB types fit.
-
-One canonical writer covers direct execution and verified imports. Stale worker generations prevent result adoption, while database-access fences prevent reads/forks/application from an invalid live base. Dropping a waiter does not necessarily stop submitted CPU work or storage I/O. Canonical mutations cannot be canceled by an advisory direction change. Retain all state still needed by workers, queries, recovery, result serving and sync.
+The full `commonware_glue::stateful::Application` lifecycle is optional reference material. Its [mailbox](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/glue/src/stateful/actor/core/mailbox.rs#L8) targets the block/ancestry `commonware_consensus::Application` and Simplex Marshal contracts. Multimmit uses different callbacks; concrete DB utilities can be reused independently.
 
 ## Result certification and state sync
 
-Execution result messages travel directly between app peers over existing authenticated P2P. The Baton scheduler does not relay, approve or gate them. Check the full exact input/range, canonical input state, runtime/rule, result and chosen output/material commitments before counting distinct epoch validators. The threshold remains `f+1`; native consensus quorum types cannot be copied unchanged. [Certification](interfaces.md#result-certification-inside-executor).
+[App result processing](interfaces.md) combines accepted direct-execution evidence with Storage-prepared commitments and peer signatures. Storage independently checks matching `f+1` evidence before applying direct or imported results. While certification is pending, valid private execution may continue; canonical state and ACK do not advance.
 
-An app may import a certified result during normal execution after both the certificate and applicable material have been verified. Continue valid direct work while either is unavailable. An imported result cannot produce the node's own direct-execution signature; the node may relay the original certificate and directly execute/sign a later range. State finalization and local durable/read readiness remain separate endpoints. [State sync](state-sync.md).
+[State sync](state-sync.md) supplies the same durable checkpoint handoff. Imported work retains its provenance and cannot produce the node's own direct-execution signature. Later work executed directly from that checkpoint may be signed.
 
 ## Open decisions
 
@@ -56,6 +80,6 @@ An app may import a certified result during normal execution after both the cert
 | Runtime `Spawner`, `Strategizer`, existing future pools | Placement/work bounds and context-checked completion; a future pool alone does not bound work |
 | Crypto signatures/certificates and typed P2P | Full execution subject, eligible distinct signers, `f+1` and direct/imported provenance |
 | QMDB sync plus resolver | Trusted execution target, compatible material and active-validator writer handoff |
-| Existing journal/metadata/barriers | App state/output/applied-index crash consistency; Marshal separately owns its delivery cursor |
+| Existing journal/metadata/barriers | App state/output/applied-index/certificate crash consistency; Marshal separately owns its delivery cursor |
 
 The [source catalog](../reference/integration.md#primitive-reuse-catalog) and [QMDB page](qmdb.md) distinguish current source from older reuse investigations. No transaction backend, result protocol, runnable scheduler or benchmark is implemented by this documentation.

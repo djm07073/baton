@@ -1,18 +1,27 @@
-# State sync from certified execution results
+# State sync: certified checkpoint handoff
 
-**The app can finish canonical work by importing a verified peer result.** This is an option during normal validator execution as well as recovery. It uses the same execution backend, applied-state identity and canonical writer as direct work. The PreCut/Baton scheduler does not approve or relay the transfer.
+<a id="state-sync-from-certified-execution-results"></a>
+
+**Storage can finish canonical work by importing a verified peer result and handing its checkpoint to Executor.** This is an option during normal validator execution as well as recovery. It uses the same storage ownership, applied-state identity and canonical writer as direct work. The PreCut/Baton scheduler does not approve or relay the transfer.
 
 Continue direct work while a certificate or applicable material is missing. A certificate arriving before the matching irrevocable input remains pending or prompts ordering recovery; it cannot settle unresolved order. Stop or fence unfinished direct execution only after both the certificate and usable material have been verified and the canonical writer can safely adopt the target.
+
+## Responsibilities and communication
+
+Result processing authenticates the target, Storage verifies/retains material and owns the writer, the App owner coordinates Update tokens, and Executor installs the checkpoint. `state.verify_material` is a concrete Storage integration helper; `Storage::certify` accepts the evidence and `StorageEvent::Committed(applied)` publishes durable completion. These are the same [Storage connections](storage.md#communication-interfaces) used by direct execution.
 
 | Stage | App checks | Result |
 |---|---|---|
 | Execution certificate | `f+1` distinct eligible epoch validators on the same exact input/range, canonical base, runtime/rule and complete result | Authenticated execution target |
 | Imported material | State delta/checkpoint and outputs match the target and correct local predecessor | Applicable candidate material |
 | Canonical handoff | Recheck the current predecessor and writer authority after async preparation; shared fences; no partial local branch used as another delta's base | Authorized app-state transition |
-| Durability | State, outputs, applied identity and imported provenance recover together | Locally ready canonical checkpoint; covered Updates may be ACKed |
-| Later execution | Direct execution from the adopted checkpoint | Own result/signature for that later range |
+| Durability | State, outputs, applied identity, certificate evidence and imported provenance recover together | Certified durable canonical checkpoint; covered Updates may be ACKed |
+| Checkpoint handoff | Storage emits `Committed` with exact prefix/runtime/state identity and a usable pinned view; App owner forwards it | Executor installs the base, skips covered input and retires incompatible memory work |
+| Later execution | Direct execution from the installed checkpoint | Own result/signature for that later range |
 
 Imported material remains imported. The app can relay the original certificate; it cannot sign the imported range as its own direct execution. Recovery that lacks direct-execution evidence cannot recreate that signing authority. State finalization, material availability and local durable/read readiness remain separate milestones. Result statement boundaries, codec, roots, material format and switching policy remain open.
+
+For a certified durable ABC target while local Executor is at A, `execution.install_checkpoint(ABC)` skips B/C and makes ABC the parent for D. The checkpoint must contain usable state access, not just a digest or numeric position. Check exact prefix/context before removing work; reject stale/conflicting completions after installation. A missing certificate, missing material or failed apply cannot produce this handoff. The [checkpoint contract](../overview/interfaces.md#checkpoint-handoff-and-execution-skipping) also governs direct commits and recovery. Marshal ACK requires certified durability, not a second ACK from Executor.
 
 ## Reuse Commonware material transport and proof validation
 
@@ -42,4 +51,4 @@ For a fresh namespace, `Start::Floor { floor_generation, floor }` requires the c
 
 An in-flight floor change replaces the delivery generation and clears Marshal's previous pending window. The App may still retain old Updates, so `max_pending_acks` alone does not bound queued work across repeated resets. Coordinate each floor transition with App intake, reconcile old exact indices/blocks and bound any overlap before accepting the new window. `Update` carries no generation field; use App-owned transition state rather than inventing an upstream flag. Concrete cross-store switching and recovery sequencing remains implementation work. [Delivery reset](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/actors/delivery/actor.rs#L423).
 
-The normal application path is still ordered Update → exact-parent reuse/repair or verified import → durable application → ACK. Both scheduling modes share it. See [canonical application](qmdb.md#commit-a-branch-to-canonical-state) and [result certification](interfaces.md#result-certification-inside-executor).
+The normal path is ordered Update → immediate `Alignment::commit(ordered)` and independent App Executor processing → exact-parent reuse/repair or verified import → Storage verifies matching `f+1` evidence and applies durably → `Committed(checkpoint)` → ACK. Both scheduling modes share it. State installation refreshes the shared execution view; it is not a second notification of already-known ordering. An authenticated native floor that advances known ordering must reconcile that prefix through the same idempotent Alignment ordering contract. See [canonical application](qmdb.md#commit-a-branch-to-canonical-state) and [result certification](interfaces.md#result-certification-inside-executor).

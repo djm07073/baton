@@ -1,6 +1,19 @@
-# Delivering finalized execution order
+# Marshal: ordered delivery and ACK
+
+<a id="delivering-finalized-execution-order"></a>
 
 **Existing Multimmit Marshal sends the App complete blocks in canonical order.** Connect `Reporter<Activity = marshal::Update<Block>>` to an App output ingress. The App uses that sequence to select/reuse/repair execution, durably applies it, then acknowledges. Baton scheduling does not reconstruct or reorder this stream.
+
+## Communication interfaces
+
+| Direction | Call or value | Completion means |
+|---|---|---|
+| Multimmit → Marshal | Native `Reporter::report(Activity)` | Native observations feed Marshal's history/custody machinery; this is not an App state commit |
+| Marshal → App owner | `Reporter::report(Update)` → `Feedback` | Complete indexed block and Exact token retained by App |
+| App owner → Marshal | `update.acknowledgement.acknowledge()` | That exact delivery is covered by certified durable App state |
+| App import/recovery coordination → Marshal | Existing floor operations | Native delivery recovery only; matching durable App state is established separately |
+
+Marshal owns native history interpretation, dense delivery, its outstanding ACK window and its cursor. The App owner retains tokens and drives execution/storage; Marshal does not execute transactions or verify App execution certificates.
 
 ## Consensus and Baton integration
 
@@ -20,7 +33,7 @@ An Update contains:
 
 An Update can be App's first encounter with that block, including for an Observer or skipped speculation. Perform the application checks needed for execution, or reuse exact validated work, without requiring an earlier local `verify` or scheduler entry. Marshal's authoritative local order does not implement App transaction semantics; App does not need a second native proof/order verifier.
 
-Only after that application durability boundary does App consume the token with `acknowledge()`. If speculation already produced valid work, this may require only selection and persistence. If it did not, App still has work before the same ACK boundary. The token itself performs no I/O and does not make state durable.
+The retained stream first informs `Alignment::commit(ordered)` of continuous finalized ordering without waiting for execution. Storage separately verifies matching `f+1` result certification before canonical application, for direct work and imports alike. Only after certified application durability does App consume the token with `acknowledge()`. Completed speculation cannot bypass the certificate gate. The token itself performs no I/O and does not make state durable.
 
 ### Delivery backpressure and recovery
 
@@ -28,7 +41,9 @@ Marshal can report multiple Updates before receiving their ACKs, up to configure
 
 For ordinary delivery within one generation, give Updates a non-dropping owned queue whose capacity accounts for that delivery window; do not share a lossy notification queue. Delivery checks `Feedback::Closed`, but a `Backoff` return does not request an Update retry. Keep its ACK while queued and while application work runs. All cloned Exact handles must acknowledge; dropping any unacknowledged clone cancels the waiter and fails delivery. [Report handling](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/actors/delivery/actor.rs#L303), [Exact semantics](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/utils/src/acknowledgement.rs#L38).
 
-A crash after App state is durable but before Marshal's ACK cursor is durable can redeliver the block. Persist enough exact applied identity/state linkage to finish that replay without applying transaction effects twice. An ACK must not mean only that the Update entered a memory queue or durable inbox: the current contract says **durably applied**. Marshal's cursor storage and App state storage are separate transactions. Coordinate state-sync floor installation with matching durable App state and fence older workers/updates before changing writer authority.
+A crash after App state is durable but before Marshal's ACK cursor is durable can redeliver the block. Persist enough exact applied identity/state/certificate linkage to verify replay without applying transaction effects twice or collecting fresh signatures. An ACK must not mean only that the Update entered an inbox or reached Alignment: the contract requires **certified durable application**. Marshal's cursor storage and App state storage are separate transactions. Coordinate state-sync floor installation with matching certified durable App state and fence older workers/updates before changing writer authority.
+
+The next bounded signing unit must fit the active delivery capacity. Execute its internal blocks on private checkpoints and sign its result before applying the whole certified unit; ACK covered Updates afterwards. Input needed for certification must not depend on those same ACKs. See the [certification-unit contract](../execution/interfaces.md#certification-units-and-delivery-progress).
 
 A floor installation resets Marshal's delivery generation and discards its old waiters; it does not remove Update values already retained by App. The new generation can deliver another window, so `max_pending_acks` alone does not bound old plus new App-held work. Update has no generation field. App owns the floor/import lifecycle and must serialize and fence that handoff, reconcile old retained input/tokens, and budget any overlap before resuming ordinary delivery. Exact switching and crash sequencing remain implementation work. [Native reset](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/actors/delivery/actor.rs#L423).
 

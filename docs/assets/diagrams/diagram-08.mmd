@@ -1,29 +1,44 @@
 sequenceDiagram
     participant N as Multimmit Engine
     participant M as Multimmit Marshal
-    participant A as App Update reporter
-    participant W as App canonical worker
-    participant S as App storage / QMDB
-    N-->>M: Reporter::report(native Activity)
-    M->>M: Verify finality / history, backfill gaps and bodies
-    alt Earlier output is unresolved
-        M->>M: Hold ordered delivery at the gap
-    else Next finalized complete block is available
-        M-->>A: Update(index, block, acknowledgement)
-        A->>A: Retain Update in app-owned inbox
-        A-->>M: Feedback without execution wait
-        A->>W: Wake canonical processing
-        W->>W: Check expected index, exact block and canonical predecessor
-        alt Exact input already durably applied
-            W->>W: Recover matching applied identity and outputs
-        else New continuous input
-            W->>W: Reuse exact work, verify import, or execute / repair
-            W->>W: Fence incompatible work before canonical mutation
-            W->>S: Prepare selected effects, apply and persist
-            S-->>W: Durable state / outputs / applied identity / provenance
-            W->>W: Advance applied base, schedule pool maintenance
+    participant A as Alignment layer / Update owner
+    participant E as App Executor / workers
+    participant S as Storage
+    N->>M: [C] Reporter::report(Activity)
+    Note over N,M: Existing finality, history and body backfill establish native output order
+    M->>A: [C] Reporter::report(Update(index, block, ack))
+    A->>A: [A] app.retain_update(update)
+    A->>A: [P] Alignment::commit(ordered), new continuous order only
+    A-->>M: Feedback immediately after retained handoff
+    A->>A: [A] app.apply_next()
+    alt Exact index and block already certified and durably applied
+        Note over A: Verify recovered certificate linkage, no duplicate effects
+    else Gap or conflicting identity
+        Note over A: Stop advancement, no ACK, reconcile or recover
+    else Next continuous canonical input
+        A->>E: [A] execution.reconcile(input, canonical_base)
+        E-->>A: StateChanges: reuse / finish / repair
+        A->>S: [P] Storage::submit(executed, changes)
+        S-->>A: Ok(()), retained but not durable
+        S-->>A: [P] StorageEvent::Prepared(prepared)
+        A->>A: [A] App result path obtains certificate evidence
+
+        alt Certificate unavailable
+            Note over A,S: Keep prepared work, no canonical state apply or ACK
+        else Certificate and prepared material available
+            A->>S: [P] Storage::certify(certificate)
+            S-->>A: Ok(()), admitted for verification, not durable
+            S-->>A: [P] StorageEvent::Committed(applied) or StorageEvent::Failed(failure)
+            Note over A,S: Verify f+1, subject, material and predecessor, failure has no ACK
+            opt Durable success
+                A->>A: [A] app.publish_applied(applied)
+                A->>E: [A] execution.install_checkpoint(applied.checkpoint)
+            end
         end
-        W-->>M: acknowledgement.acknowledge()
-        M->>M: Advance continuous ACK prefix, persist delivery cursor
     end
-    Note over N,M: Native voting and cut formation do not wait for application ACK
+    opt Exact delivery is covered by certified durable applied identity
+        A-->>M: [C] update.acknowledgement.acknowledge()
+        M->>M: Existing contiguous ACK window and cursor persistence
+    end
+    Note over N,M: Native voting and cut formation do not await App ACK
+    Note over A,E: Works without prior verify or speculative candidate

@@ -1,18 +1,23 @@
 flowchart TB
-    N[Multimmit engine] -->|propose / verify| A
-    N -->|Relay / Activity| M[Multimmit Marshal]
-    M -->|ordered Update| A
-    A -->|stage / subscribe / fetch| M
-    subgraph APP[Application]
-        T[Transaction pool] -->|select batch| A[Existing callback handles]
-        A -->|usable candidate| S[Pre-cut or Baton scheduler]
-        S -->|exact-parent job| E[Execution workers and checkpoints]
-        A -->|canonical input| E
-        E -->|selected effects| W[State backend and canonical writer]
+    N["Consensus<br/>Multimmit Engine"] -->|"[C] Automaton::propose / verify"| M
+    N -->|"[C] Relay::broadcast<br/>Reporter::report(Activity)"| R["Existing Multimmit Marshal"]
+    M <-->|"[C] App calls stage / subscribe / fetch / ACK<br/>Marshal calls report(Update)"| R
+    subgraph APP["Application"]
+        subgraph MW["Alignment layer"]
+            M["Callback handles and Update owner"]
+            M <-->|"[P] Alignment::admit / commit(ordered)<br/>internal AlignmentPolicy::next"| S["PreCutAlignment<br/>or BatonAlignment<br/>pub(crate) implementations"]
+        end
+        P["App pool and payload code"]
+        E["App Executor<br/>execution and in-memory checkpoints"]
+        C["Storage<br/>cold reads, certification and persistence"]
+        M -->|"[A] pool.select(ctx, limits)"| P
+        M <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges"| E
+        M <-->|"[P] Storage::submit / certify<br/>StorageEvent::Prepared / Committed"| C
+        E <-->|"[P] Storage::read(view, key)<br/>pinned cold state"| C
+        C -->|"[A] via App owner<br/>execution.install_checkpoint"| E
     end
-    W -->|ACK after durable apply| M
-    W --> Q[Commonware QMDB]
+    C -->|"[C] apply / finalize / Barrier::durable"| Q["QMDB / DatabaseSet"]
     classDef reuse fill:#dbeafe,stroke:#2563eb,color:#172554;
     classDef app fill:#dcfce7,stroke:#16a34a,color:#14532d;
-    class N,M,Q reuse;
-    class T,A,S,E,W app;
+    class N,R,Q reuse;
+    class M,S,P,E,C app;

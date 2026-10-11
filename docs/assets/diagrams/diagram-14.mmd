@@ -1,33 +1,40 @@
 sequenceDiagram
     participant P as Peer Validator App
-    participant A as Local App
-    participant S as App storage / QMDB
+    participant A as Local App owner
+    participant S as Storage
+    participant E as App Executor
     participant M as Multimmit Marshal
-    A->>A: Continue valid local execution while result is unavailable
-    P-->>A: Result certificate
-    A->>A: Verify f+1 eligible signatures and exact input / predecessor
-    alt Irrevocable input or predecessor unresolved
-        A->>A: Retain pending certificate and continue valid local work
-    else Certificate valid in exact context
-        A->>P: Request matching material and outputs
-        P-->>A: State material
-        A->>S: Validate material against authorized base and target
-        S-->>A: Applicable material or failure
-        alt Material unavailable or invalid
-            A->>A: Keep executing / recover valid material
-        else Material applicable
-            A->>A: Fence conflicting unfinished work
-            A->>S: Apply through canonical writer and persist linked metadata
-            alt Durable import completes
-                S-->>A: Durable applied identity / outputs / provenance
-                A->>A: Keep imported provenance and original certificate
-                A->>A: Advance canonical base and schedule pool maintenance
-                opt Pending Updates covered by this exact durable prefix
-                    A-->>M: Acknowledge retained matching Updates
+    Note over A,E: Local Executor is at A, certified target covers ABC
+    P-->>A: wire: ExecutionCertificate(statement, signatures)
+    A->>A: [A] results.accept(certificate, canonical_context)
+    alt Invalid or unresolved irrevocable input / base
+        Note over A: Reject or retain pending evidence, continue valid direct work
+    else VerifiedCertificate for exact input and base
+        A-->>P: wire: MaterialRequest(verified_target)
+        P-->>A: wire: StateMaterial(target, data, outputs)
+        A->>S: [A] state.verify_material(certificate, material, base)
+        S-->>A: PreparedImport or unavailable / invalid
+        alt Material not applicable
+            Note over A: Continue direct work, no authority transfer
+        else Verified applicable PreparedImport
+            A->>S: [P] Storage::certify(certificate)
+            S-->>A: Ok(()), admitted for verification, not durable
+            Note over A,S: Verify f+1 and material, recheck base and fence conflicts before mutation
+            alt Rejected before mutation
+                S-->>A: [P] StorageEvent::Failed(failure), no ACK
+                Note over A,S: Retain input, reconcile context, no ACK
+            else Successful durability and recoverable certificate linkage
+                S-->>A: [P] StorageEvent::Committed(applied), checkpoint ABC, imported
+                A->>A: [A] app.publish_applied(applied)
+                A->>E: [A] execution.install_checkpoint(applied.checkpoint)
+                E->>E: Skip B/C, retire covered or conflicting attempts
+                Note over A,E: Next job uses ABC as parent, stale completions cannot attach
+                opt Retained Updates covered by exact durable identity
+                    A-->>M: [C] update.acknowledgement.acknowledge()
                 end
-                A->>A: Resume work from imported canonical state
-            else Durable completion fails
-                A->>A: No ACK, recover authoritative state before reuse
+                A->>A: [A] app.dispatch_ready() from imported base
+            else Mutation or durability failure
+                Note over A,S: No ACK, stop failed store and recover authoritative state
             end
         end
     end

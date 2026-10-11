@@ -1,22 +1,23 @@
 sequenceDiagram
     participant C as Client / tx peer
-    participant A as App
-    participant P as App TxPool
-    participant W as App canonical worker
-    C->>A: Submit transaction
-    A->>P: Internal admit(tx, source)
-    P->>P: Stateless validation and payload policy
-    alt Invalid input
-        P-->>A: Reject
+    participant A as App ingress
+    participant P as App pool / payload
+    participant W as App canonical owner
+    C->>A: wire: Transaction(tx)
+    A->>P: [A] pool.admit(tx, source)
+    P->>P: Bounded encoding, signature, static policy and duplicate checks
+    alt Invalid transaction
+        P-->>A: Admission::Rejected(reason)
     else Valid selected candidate
-        P->>P: Deduplicate and retain as selected
-        P-->>A: Admission accepted
+        P-->>A: Admission::Selected(tx_id)
     else Valid unselected candidate
-        P->>P: Retain for selected propagation / retention policy
-        P-->>A: Admission accepted, excluded from local batches
+        P-->>A: Admission::Unselected(tx_id)
     end
-    A->>P: Internal select(Context, limits) during propose
-    P-->>A: Bounded candidate batch, candidates retained
-    Note over A,P: Selection and proposal cancellation are not canonical retirement
-    W-->>P: Durable canonical transaction outcomes
-    P->>P: Reconcile candidates through the selected backend
+    A-->>C: Admission result under chosen ingress contract
+    A->>P: [A] pool.select(ctx, limits)
+    P-->>A: RetainedBatch(bytes, transaction_ids)
+    Note over A,P: Selection does not retire transactions, cancellation keeps body bytes stable
+    W->>W: [A] app.publish_applied(DurableApplied)
+    W-->>P: [A] pool.reconcile(applied_outcomes)
+    P->>P: Maintain chosen backend, replay missed maintenance before relying on readiness
+    Note over W,P: Pool processing does not gate canonical ACK

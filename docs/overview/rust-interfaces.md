@@ -1,6 +1,8 @@
-# Rust connection points
+# Existing Rust signatures
 
-**Implement existing Commonware callbacks on application handles. Keep pool, scheduling, execution and state management as concrete App code.** No new public `Executor`, `Baton`, `TxPool`, `Storage` or `BlockService` trait is required by this design.
+<a id="rust-connection-points"></a>
+
+**Implement existing Commonware callbacks on application handles.** This page contains native API excerpts. The separate [interface map](interfaces.md) defines the proposed App contracts: `Alignment`, internal `AlignmentPolicy` and `Storage`.
 
 These are existing API excerpts from [checkout 6233438](https://github.com/0xEyrie/monorepo/tree/6233438985d8249d2b2bc1204191d5d405652288), with surrounding generic bounds/imports omitted where stated. They are not standalone compilable declarations or a new application protocol. The [single Rust reference file](../assets/interfaces/baton.rs) is generated from this page; edit this source, then run `npm run docs:interfaces`.
 
@@ -113,7 +115,7 @@ Use concrete admission/selection functions. Admission applies bounded structural
 <a id="planner"></a>
 <a id="baton"></a>
 
-## Schedulers stay inside App
+## Alignment stays inside App
 
 Select a concrete Pre-cut or Baton implementation at startup. Both operate on shared candidate/checkpoint state and preserve `F ++ sort_G(S_pending)`. Baton additionally handles reports, frozen-window evaluation and direction. Private handlers and existing runtime workers suffice; no public `on_block/on_finality/execute/commit` framework is introduced. Marshal already supplies ordinary ordered delivery. [Scheduling behavior](../baton/direction.md).
 
@@ -124,10 +126,10 @@ Select a concrete Pre-cut or Baton implementation at startup. Both operate on sh
 
 ## Execution and state stay inside App
 
-Transaction workers produce effects/checkpoints on exact parents. App's backend prepares roots when useful, applies canonical material through a single writer and recovers state/applied metadata. Reuse concrete QMDB handles; keep root-deferred branching limits explicit. No additional public execution/storage traits are needed to call these functions from `verify` and `report(Update)` handlers.
+Transaction workers produce effects/checkpoints on exact parents. Storage prepares selected roots, applies canonical material through one writer and recovers durable checkpoints. Executor installs those checkpoints as read-only bases and skips covered input. Reuse concrete QMDB handles; keep root-deferred branching limits explicit. The proposed `Storage` contract specifies pinned cold reads, ordered StateChanges submission, certificate intake and retained Prepared/Committed events. Storage owns roots and physical batching; Executor and result collection remain concrete App code. Submission acceptance does not mean durability.
 
 ## Interface boundary for state finalization and state sync
 
 App's execution components exchange signatures, certificates and change sets directly over Commonware P2P. Retain full input/range, canonical base, runtime and result binding; collect `f+1` distinct eligible epoch signatures for the research result endpoint. A received certificate is not durable state, and imported material cannot become an own direct-execution signature.
 
-Direct canonical apply may proceed while peer signatures are collected once exact order/base and valid direct effects hold. Imported apply additionally verifies its certificate, material and applicability before stopping local work. The scheduler supplies no approval for either path. Concrete VM, result wire format, safe switching and rootless branch representation remain implementation work. [Execution](../execution/interfaces.md), [state backend](../execution/qmdb.md) and [state sync](../execution/state-sync.md) retain those contracts without requiring public layer traits.
+`Alignment::commit(ordered)` records finalized ordering without waiting for execution or signatures. Storage requires a matching verified `f+1` certificate before canonical application for both direct and imported results. Missing certification keeps prepared work pending. Imported apply also verifies material and applicability before stopping local work. The scheduler supplies no state-commit approval. Concrete VM, result wire format, safe switching and rootless branch representation remain implementation work. [Execution](../execution/interfaces.md), [state backend](../execution/qmdb.md) and [state sync](../execution/state-sync.md) detail the implementation behind the proposed [Storage contract](interfaces.md#proposed-storage-interface).

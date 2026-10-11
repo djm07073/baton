@@ -1,10 +1,10 @@
 flowchart LR
-    S[S0: canonical state] --> A[A from S0]
-    A --> AB[B from A: AB checkpoint]
-    AB --> ABC[C from AB]
-    AB --> ABD[D from AB]
-    S --> X[X from S0]
-    X --> XA[A from X: different execution]
+    S["S0: canonical checkpoint"] -->|"[A] execution.execute(job)<br/>A @ S0"| A["Checkpoint A"]
+    A -->|"[A] execution.execute(job)<br/>B @ A"| AB["Checkpoint AB"]
+    AB -->|"[A] execution.execute(job)<br/>C @ AB"| ABC["Checkpoint ABC"]
+    AB -->|"[A] execution.execute(job)<br/>D @ AB"| ABD["Checkpoint ABD"]
+    S -->|"[A] execution.execute(job)<br/>X @ S0"| X["Checkpoint X"]
+    X -->|"[A] execution.execute(job)<br/>A @ X"| XA["Checkpoint XA: different execution"]
     classDef canonical fill:#dbeafe,stroke:#2563eb,color:#172554;
     classDef reuse fill:#dcfce7,stroke:#16a34a,color:#14532d;
     classDef pending fill:#ffedd5,stroke:#ea580c,color:#431407;

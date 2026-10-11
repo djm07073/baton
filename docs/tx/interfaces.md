@@ -1,14 +1,20 @@
-# Transaction admission and selection
+# TxPool: admission and selection
 
-**Use concrete pool operations inside the app; implement the existing `Automaton` at the consensus boundary.** No public TxPool trait is required. The [callback interfaces](../overview/rust-interfaces.md) show the actual Commonware connection.
+<a id="transaction-admission-and-selection"></a>
 
-## Interface overview
+**TxPool retains transactions and supplies bounded batches for local proposals.** It owns admission, selected/unselected classification, duplicate handling and canonical maintenance. App callbacks call its concrete operations; these do not require a public TxPool trait.
 
-| App operation | Called by | Completion means |
+<a id="interface-overview"></a>
+
+## Communication interfaces
+
+| Direction | Call or value | Completion means |
 |---|---|---|
-| Admit transaction | RPC or peer ingress | Bounded input validated and retained as selected/unselected, or rejected |
-| Select batch | `Automaton::propose(context)` handler | Stable selected bytes fit dependency, count, work and full-body limits |
-| Maintain canonical pool state | App's durable application path | Exact applied outcomes reconciled with the chosen pool backend |
+| Client/peer ingress → TxPool | `pool.admit(tx, source)` → `Admission` | Bounded input validated and retained as selected/unselected, or rejected |
+| App propose handler → TxPool | `pool.select(ctx, limits)` → `RetainedBatch` | Stable selected bytes fit dependency, count, work and full-body limits |
+| App durable-outcome handling → TxPool | `pool.reconcile(applied_outcomes)` | Exact applied outcomes reconciled with the chosen backend |
+
+These concrete calls are defined in the [communication reference](../overview/interfaces.md#private-pool-and-execution-calls). The [App callback](../baton/interfaces.md#automatonpropose-pool-to-staged-block) packs selected bytes into a producer block. Pool selection never substitutes for canonical inclusion.
 
 Admission verifies encoding, signature/domain and chosen stateless rules, then applies payload-based policy. Both RPC and peer paths use the same classification. Selected candidates may enter local batches. Valid unselected candidates remain only for the chosen retention/propagation policy. Invalid input is dropped. These classes need no second pool, actor or physical connection. Static classification uses immutable payload facts; live balances, canonical nonces and node load belong to separate readiness checks.
 
@@ -34,16 +40,6 @@ Transaction ID, body digest and native header digest identify different objects.
 
 ## Connect one existing backend
 
-Reuse one fitting candidate store and its deduplication/selection machinery. Keep app-specific classification in its existing admission paths.
+The chosen backend must preserve stable proposal bytes, dependency-aware selection and reconciliation from durable outcomes. Backend choice, transaction codec/identity, duplicate semantics, static policy, quotas and physical retention remain open.
 
-| Candidate | Existing operations | App connection still required |
-|---|---|---|
-| Nunchi | `submit`, `pending(count)`, `finalized` | SHA-256/nonce-lane fit, classification in both local and peer ingress, byte packing, canonical nonce hydration and lost-update reconciliation |
-| Reth | `add_transaction`, dependency-aware best iterator, canonical maintenance | Ethereum transaction/provider semantics and complete canonical outcome mapping |
-| Constantinople | Admission, bounded foreground/background queues, batch selection | Fixed transaction/context types, destructive selection retention/cancellation, canonical lifecycle and source-version adaptation |
-
-Nunchi's private pool kernel can be adapted through its existing Message/handle/handler. Its lossy `finalized` notification does not establish processing; startup and lost-update reconciliation remain necessary. Its limited pending walk can underfill after filtering, and a selected successor cannot bypass an excluded required predecessor. [Nunchi handle](https://github.com/nunchi-labs/sdk/blob/eea35ced709f68c15d6fbc8bcc754696a7e44374/mempool/src/actor.rs#L61), [pending walk](https://github.com/nunchi-labs/sdk/blob/eea35ced709f68c15d6fbc8bcc754696a7e44374/mempool/src/pool.rs#L160).
-
-Constantinople pops selected candidates; retain bytes and reconcile canceled proposals if adapting it to the app's selection contract. Reth's local iterator exclusion is separate from mined canonical cleanup; use its full canonical maintenance when that backend is selected. These are source-adaptation candidates, with unverified compatibility to the current Multimmit graph. [Constantinople selection](https://github.com/commonwarexyz/constantinople/blob/3b6c92e76bf582855615844a4175b8304808f6a9/crates/mempool/src/webserver/actor.rs#L402), [Reth maintenance API](https://github.com/paradigmxyz/reth/blob/038edab20dfff017f7a7502e683c732e5628ad89/crates/transaction-pool/src/traits.rs#L773).
-
-Backend choice, transaction codec/identity, duplicate semantics, static policy, quotas and physical retention remain open. The [pool survey](README.md#reuse-an-existing-pool-without-importing-the-wrong-lifecycle) retains the detailed source fit and limits.
+The [pool backend survey](README.md#backend-operation-mapping) compares Nunchi, Reth and Constantinople operations and their integration limits. Read it when selecting an implementation; the communication contract above applies to each candidate.

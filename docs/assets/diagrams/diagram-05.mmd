@@ -1,30 +1,45 @@
 sequenceDiagram
-    participant N as Native engine
-    participant A as App Automaton
+    participant N as Multimmit Engine
+    participant A as Alignment layer / Automaton
     participant M as Multimmit Marshal
-    participant Q as App scheduler
-    N->>A: verify(Context, body digest)
-    A->>A: Derive exact header and BlockRef
-    A->>M: subscribe_block(BlockRef)
-    Note over A,M: Waits for durable local / buffered custody, no explicit peer fetch
-    opt Concurrent active retrieval if required
-        A->>M: fetch_block(BlockRef)
-        M->>M: Existing resolver / peer backfill
+    participant E as App Executor / workers
+    N->>A: [C] Automaton::verify(ctx, body_digest).await
+    A-->>N: Receiver[bool]
+    A->>A: [C] ctx.header(body_digest) -> header
+    A->>A: [C] header.block_ref() -> exact BlockRef
+    A->>M: [C] subscribe_block(reference).await
+    opt Explicit retrieval needed, concurrent with subscription
+        A->>M: [C] fetch_block(reference).await
+        Note over A,M: Fetch may return buffered bytes, it does not prove durable custody
     end
-    alt Required exact block still unavailable
-        Note over N,A: Keep verdict pending while the condition may change
-    else Expected block available
-        M-->>A: subscribe_block resolves with durable complete block
-        A->>A: Check context, digest and application payload validity
-        alt Expected payload permanently invalid
-            A-->>N: Verification receiver resolves false
-        else Valid payload with durable custody
-            A->>A: Deduplicate and retain validated candidate facts
-            A-->>N: Verification receiver resolves true
-            opt Live candidate has required authentication / ancestry
-                A->>Q: Internal eligible pending admission
-                Q->>Q: Sort pending, dispatch only with exact parent ready
+    alt Required data or dependency still missing
+        Note over N,A: Keep verdict pending until a verdict or native cancellation
+    else Exact block available
+        M-->>A: full_block (subscription or fetch result)
+        A->>A: [A] app.check_payload(ctx, full_block) -> PayloadVerdict
+        alt PayloadVerdict::Invalid
+            A-->>N: verdict_reply.send(false)
+        else PayloadVerdict::Pending
+            Note over N,A: Retain live request, do not return false
+        else PayloadVerdict::Valid
+            opt Fetch won and durable custody not yet established
+                A->>M: [C] put_block(full_block).await
+                M-->>A: Ok(()) or custody error
+                Note over A,M: On success retire superseded subscription, no redundant put after successful subscription
+            end
+            alt Custody failed
+                Note over N,A: No true verdict, stop failed local storage path and recover
+            else Durable custody established
+                A->>A: [A] app.admit_candidate(candidate)
+                A-->>N: verdict_reply.send(true)
+                opt Eligible live Job with ready parent and resources
+                    A->>A: [A] app.dispatch_ready() -> claimed Job
+                    A->>E: [A] execution.execute(job)
+                    E-->>A: ExecutionOutcome(job_id, StateChanges)
+                    A->>A: [A] app.finish_job(job_id, outcome)
+                end
             end
         end
     end
-    Note over A,Q: Speculative execution completion does not gate verify
+    Note over N,A: Remote, local pre-sign and recovery calls share this interface
+    Note over A,E: Custody errors never become true, execution completion does not gate verify

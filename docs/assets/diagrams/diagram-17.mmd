@@ -1,20 +1,19 @@
 flowchart TB
-    M[Multimmit Marshal] -->|ordered Update and ACK token| E
-    subgraph A[Application]
-        Q[PreCut or Baton scheduler] --> E[Transaction execution and exact-parent tree]
-        E -->|completed effects| P[Selected root preparation]
-        P --> W[Single canonical writer]
-        E -->|optional rootless prefix| O[Retained effects / working overlay]
-        O --> P
-        W --> D[Durable applied identity / outputs / provenance]
+    M["Multimmit Marshal"] <-->|"[C] report(Update) / ACK"| A["App canonical owner"]
+    A <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges<br/>execution.install_checkpoint: local adoption"| E["App Executor<br/>in-memory overlays and checkpoints"]
+    subgraph S["Storage"]
+        R["Pinned read views"]
+        P["Selected material and root preparation"]
+        W["Verify f+1 and material<br/>single canonical writer"]
     end
-    E -->|valid concrete reads and writes| U[QMDB unmerkleized batches]
-    U -->|merkleize when selected| K[QMDB sealed batches]
-    K --> W
-    W -->|apply then finalize| B[DatabaseSet / QMDB]
-    B -->|covering durability| D
-    D -->|acknowledge Update| M
+    A <-->|"[P] Storage::submit(executed, changes)<br/>Ok(()), later StorageEvent::Prepared"| P
+    P -->|"[C] new_batches / fork_batches<br/>[A] materialize StateChanges<br/>[C] merkleize"| B["Concrete QMDB batches"]
+    B -->|"Sealed material"| W
+    A -->|"[P] Storage::certify(certificate)"| W
+    W <-->|"[C] apply / finalize<br/>Barrier::durable() == true"| D["DatabaseSet / QMDB"]
+    W -->|"[P] StorageEvent::Committed(applied)<br/>after batched durability"| A
+    E <-->|"[P] Storage::read(view, key)<br/>pinned cold state"| R
     classDef reuse fill:#dbeafe,stroke:#2563eb,color:#172554;
     classDef fresh fill:#dcfce7,stroke:#16a34a,color:#14532d;
-    class M,U,K,B reuse;
-    class Q,E,P,W,D,O fresh;
+    class M,B,D reuse;
+    class A,E,R,P,W fresh;

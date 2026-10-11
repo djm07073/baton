@@ -1,6 +1,29 @@
-# Block construction and body exchange
+# Marshal: block custody and exchange
+
+<a id="block-construction-and-body-exchange"></a>
 
 **App builds and validates transaction bodies; existing Multimmit Marshal stores and exchanges complete blocks.** Put the TxPool inside App. Selected transactions feed `Automaton::propose`; `Automaton::verify` obtains durable custody and makes valid eligible blocks available to the App scheduler.
+
+<a id="reuse-the-same-body-components-as-tempo"></a>
+
+<a id="use-marshals-existing-body-apis"></a>
+
+## Communication interfaces
+
+| App need | Existing call | Completion condition |
+|---|---|---|
+| Submit a built block | `marshal.stage_block(block)` | Accepted storage work; returned Custody token may still be pending |
+| Wait for durable submission | `custody.wait()` or `marshal.put_block(block)` | Block durably recoverable |
+| Wait for expected bytes | `marshal.subscribe_block(reference)` | Exact complete block under durable custody; starts no active peer fetch |
+| Explicit peer fetch | `marshal.fetch_block(reference)` | Resolve requested complete block through existing backfill |
+| Local lookup | `marshal.get_block(reference)` | Read local material without initiating peer fetch |
+| Publication | Existing `marshal::Relay` | Request buffered broadcast of the staged complete block |
+
+The earlier Tempo/Alto investigation established the buffer/resolver/storage composition. Current native `log-multimmit` supplies directly compatible assembly: buffered full-block broadcast → `marshal::open` → resolver bridge → `Service::relay` → `Service::start`. Start from [that code](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/examples/log-multimmit/src/marshal.rs#L126). Other chain versions remain [historical references](../reference/integration.md#reference-versions-are-not-one-compatible-dependency-graph).
+
+Accepted DA evidence may independently trigger backfill that fulfills a subscription. `get_block` can read buffered local material, and `fetch_block` can complete after buffered admission before its storage sync. Neither success alone establishes the verify custody fence. Use successful `subscribe_block`, `put_block`, or a staged Custody token's successful wait; a successful subscription needs no redundant second flush. [Mailbox contracts](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/mailbox.rs#L327).
+
+If missing broadcast requires active retrieval, start `fetch_block(reference)` without waiting for the pending subscription to finish. When fetch supplies the exact valid block first, `put_block(block).await` can establish custody and the superseded subscription can be canceled. Do not assume a successful fetch wakes every earlier subscription: a subscription whose backfill wait failed may still be waiting only on buffered ingress. This uses the existing APIs; a subscription that already succeeded needs no extra put. [Subscription race](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/service/router.rs#L330).
 
 ## Interface overview
 
@@ -19,26 +42,7 @@ Concretely, implement `Write`, `Read`, and `EncodeSize` (or `FixedSize`) for the
 
 App supplies the bounded body codec and correct commitment implementation. The marker and header/body digest comparison do not implement transaction signatures, payload policy or VM semantics. Marshal checks native identity and custody; App's validity/execution code handles those application rules. No additional block-validation trait is required.
 
-The producer-header parent differs from the execution-state parent. Scheduler/execution state records its own exact checkpoint, input sequence and runtime identity. Identical body bytes in different producer contexts do not give an interchangeable block/execution identity.
-
-<a id="reuse-the-same-body-components-as-tempo"></a>
-
-## Use Marshal's existing body APIs
-
-The earlier Tempo/Alto investigation established the buffer/resolver/storage composition. Current native `log-multimmit` supplies directly compatible assembly: buffered full-block broadcast → `marshal::open` → resolver bridge → `Service::relay` → `Service::start`. Start from [that code](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/examples/log-multimmit/src/marshal.rs#L126). Other chain versions remain [historical references](../reference/integration.md#reference-versions-are-not-one-compatible-dependency-graph).
-
-| App need | Existing call | Completion condition |
-|---|---|---|
-| Submit a built block | `marshal.stage_block(block)` | Accepted storage work; returned Custody token may still be pending |
-| Wait for durable submission | `custody.wait()` or `marshal.put_block(block)` | Block durably recoverable |
-| Wait for expected bytes | `marshal.subscribe_block(reference)` | Exact complete block under durable custody; starts no active peer fetch |
-| Explicit peer fetch | `marshal.fetch_block(reference)` | Resolve requested complete block through existing backfill |
-| Local lookup | `marshal.get_block(reference)` | Read local material without initiating peer fetch |
-| Publication | Existing `marshal::Relay` | Request buffered broadcast of the staged complete block |
-
-Accepted DA evidence may independently trigger backfill that fulfills a subscription. `get_block` can read buffered local material, and `fetch_block` can complete after buffered admission before its storage sync. Neither success alone establishes the verify custody fence. Use successful `subscribe_block`, `put_block`, or a staged Custody token's successful wait; a successful subscription needs no redundant second flush. [Mailbox contracts](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/mailbox.rs#L327).
-
-If missing broadcast requires active retrieval, start `fetch_block(reference)` without waiting for the pending subscription to finish. When fetch supplies the exact valid block first, `put_block(block).await` can establish custody and the superseded subscription can be canceled. Do not assume a successful fetch wakes every earlier subscription: a subscription whose backfill wait failed may still be waiting only on buffered ingress. This uses the existing APIs; a subscription that already succeeded needs no extra put. [Subscription race](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/service/router.rs#L330).
+The producer-header parent differs from the execution-state parent. Alignment/execution state records its own exact checkpoint, input sequence and runtime identity. Identical body bytes in different producer contexts do not give an interchangeable block/execution identity.
 
 ## Select transactions and build a block
 

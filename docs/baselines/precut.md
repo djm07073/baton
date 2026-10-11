@@ -1,27 +1,29 @@
-# Pre-cut execution without Baton
+# Pre-cut baseline and comparisons
+
+<a id="pre-cut-execution-without-baton"></a>
 
 **PreCut is an app-owned scheduler that executes eligible blocks before their canonical order arrives from Multimmit Marshal.** The app then reuses matching work or repairs the changed suffix. It shares the transaction pool, body format/custody, execution backend, storage, result protocol and measured endpoints with the Baton app configuration.
 
 PreCut has no Baton instance, report window, direction exchange or report-dependent native policy. It is a separate scheduling mode, not Baton with reporting disabled. Native Multimmit and Marshal supply the same ordinary canonical block order as Original. These are implementation-design documents; no runnable scheduler, E2E result or benchmark is claimed.
 
+Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../overview/interfaces.md#diagram-notation) for contracts and implementation ownership.
+
 ## Architecture and responsibilities
 
 ```mermaid
 flowchart TB
-    N[Native Multimmit] -->|propose / verify| I
-    N -->|Activity| M[Existing Multimmit Marshal]
-    M -->|ordered Update and ACK token| I
-    subgraph A[PreCut]
-        T[Transaction pool] -->|selected txs for propose| I[Existing callback handles]
-        I -->|eligible candidate after valid custody| Q[PreCut: sort pending only]
-        Q -->|exact-parent work| E[Shared execution tree / transaction backend]
-        I -->|canonical index and block| E
-        E --> S[Shared selected-root and durable application path]
-        S -->|durable outcomes| T
+    N["Multimmit Engine"] -->|"[C] Automaton::propose / verify"| I
+    N -->|"[C] Reporter::report(Activity)"| M["Multimmit Marshal"]
+    subgraph A["PreCut inside App"]
+        I["Alignment layer callback handles"] -->|"[A] pool.select / pool.reconcile"| T["App pool"]
+        I <-->|"[P] Alignment::admit / commit<br/>AlignmentPolicy::next (internal)"| Q["PreCutAlignment"]
+        I <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges"| E["App Executor: workers and checkpoints"]
+        I <-->|"[P] Storage::submit / certify<br/>StorageEvent::Prepared / Committed"| S["Storage<br/>reads, f+1 and persistence"]
+        I -->|"[A] execution.install_checkpoint"| E
+        E <-->|"[P] Storage::read(view, key)<br/>cold state at pinned base"| S
     end
-    I -->|stage / subscribe / fetch| M
-    S -->|ACK after durable apply| M
-    E <-->|execution certificates / verified state material| P[Peer applications]
+    I <-->|"[C] custody / ACK to Marshal<br/>report(Update) to App"| M
+    I <--->|"wire: execution evidence / state material"| P["Peer Apps"]
     classDef reuse fill:#dbeafe,stroke:#2563eb,color:#172554;
     classDef fresh fill:#dcfce7,stroke:#16a34a,color:#14532d;
     class N,M reuse;
@@ -36,9 +38,11 @@ flowchart TB
 | Native Multimmit | Producer headers, DA, proposals, votes, finality, tip extraction, extension and native recovery |
 | Existing Multimmit Marshal | Durable body custody, relay, native proof/history verification, backfill, ordinary dense order and recoverable delivery cursor |
 | App PreCut scheduler | Candidate deduplication, pending-only global ordering and dispatch with exact execution parents |
-| Shared app execution/storage code | Transaction effects, branch reuse/repair, selected roots, writer/fencing, durable apply, result certification and peer sync |
+| App Executor | In-memory computation and checkpoints, branch reuse/repair; StateChanges are its sole state-data payload, paired with exact ordered-range metadata |
+| Storage | Selected roots, writer/fencing, certificate verification, durable apply, state import/recovery and usable checkpoint handoff |
+| App result processing | Sign accepted direct results and exchange execution evidence/material with peers |
 
-No separate BlockService, Orderer, Executor or Storage public trait is required. Existing Marshal already implements the ordinary ordering/custody/delivery machinery that earlier drafts assigned to a new baseline attachment. The app implements transaction semantics and scheduling through concrete internal code.
+`PreCutAlignment` implements public `Alignment` (`admit`, `commit`) and crate-internal `AlignmentPolicy` (`next`). The internal dispatch loop shares the latter contract with Baton. Both modes use public `Storage::read/submit/certify` and its retained events. Executor reads cold values at a pinned base and submits exact ordered changes without awaiting durability. `Committed` supplies a checkpoint to skip covered input and retire memory safely; import and recovery use the same handoff. Existing Marshal already implements the ordinary ordering/custody/delivery machinery that earlier drafts assigned to a new baseline attachment. The app implements transaction semantics and scheduling through concrete internal code.
 
 ## Inputs and Rust connection points
 
@@ -68,12 +72,16 @@ PreCut dispatch:
 
 app handles Marshal Update:
     retain Update and return promptly from report
+    notify Alignment::commit of new continuous finalized order without waiting
     consume index in canonical order
-    if this exact index/block is already durably applied:
+    if this exact index/block has recovered certified durable application:
         ACK redelivery and return without applying again
-    reuse matching work or complete/repair from exact predecessor
-    recheck current predecessor and writer authority before mutation
-    apply exact result with recoverable app identity and outputs
+    gather the next bounded certification unit within the delivery window
+    reuse matching work or complete/repair using its private exact-parent checkpoints
+    prepare the result and verify f+1 distinct matching result signatures
+    if certification is missing or mismatched: keep work pending without state apply or ACK
+    recheck certificate, material, predecessor and writer authority before mutation
+    apply the authorized unit with recoverable identity, outputs and certificate evidence
     on App owner, publish the matching durable canonical advance once
     ACK after durable application
 ```
@@ -99,15 +107,15 @@ A producer-header parent is not an execution predecessor across lanes. Dispatch 
 | Duplicate Update after crash | Check exact durable applied identity and ACK without duplicate effects |
 | Gap before next native output | Marshal backfills/holds delivery; native consensus continues |
 
-A callback returning from `report` means local intake, not durable apply. The app owns the ACK until that block is durably applied. Matching speculation can reduce remaining work to preparation/persistence; a mismatch or missing work requires completion/repair first. Marshal's application-delivery window can fill while ACKs are outstanding, independently of native voting/finality. Do not signal ACK merely to make the callback nonblocking.
+A callback returning from `report` means retained intake and ordering notification, not durable apply. `Alignment::commit` reflects ordering immediately. Storage requires matching `f+1` certification before canonical application for both direct and imported work. Completed speculation cannot bypass that gate. The App owns each ACK until certified durability covers its input. A certification unit must fit the active delivery window; private computation within the unit precedes its application. Marshal delivery can fill while ACKs are outstanding, independently of native voting/finality. Do not ACK uncertified work to free capacity.
 
-Canonical application and imports share one writer. Recheck descendants after the canonical base moves; stale completions cannot promote another branch. Persist recoverable state, outputs, applied index/block and direct/imported provenance before ACK. Marshal later persists its own cursor, so recovery must handle redelivery. Pool maintenance stays internal and can reconcile from durable outcomes.
+Canonical application and imports share one writer. Recheck descendants after the applied state base moves; stale completions cannot promote another branch. Persist recoverable state, outputs, applied index/block, certificate evidence and direct/imported provenance before ACK. Marshal later persists its own cursor, so recovery must handle redelivery. Pool maintenance stays internal and can reconcile from durable outcomes.
 
 Repair in response to an unfinalized cut proposal is still an open additional policy. This page adopts confirmed Update processing, not automatic tentative-proposal repair. Global comparator/tie-break and resource budgets remain open; the existing Marshal base order must not be confused with that speculative global rule.
 
 ## Result certification and state sync
 
-Use the same [result verification](../execution/interfaces.md#result-certification-inside-executor) and [certified state-sync path](../execution/state-sync.md) as Baton. State finalization still requires irrevocable exact input/base plus `f+1` distinct eligible signatures on the same runtime/result statement. Durable application/read readiness is a separate endpoint.
+Use the same [result verification](../execution/interfaces.md#result-certification-inside-executor) and [certified state-sync path](../execution/state-sync.md) as Baton. State finalization requires irrevocable exact input/base plus `f+1` distinct eligible signatures on the same runtime/result statement. It precedes canonical application and durable/read readiness. Apply this gate in Original, PreCut and Baton comparisons alike.
 
 App peers exchange results/material directly. A valid applicable certificate and material can replace unfinished local repair through the shared writer/fencing contract. Imported work cannot be signed as own direct execution. Keep this capability/configuration identical across comparisons and measure direct repair versus imported completion separately.
 

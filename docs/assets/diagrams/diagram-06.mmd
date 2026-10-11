@@ -1,29 +1,29 @@
 sequenceDiagram
-    participant N as Native leader context / proposed policy integration
-    participant L as Leader App / Baton scheduler
-    participant V as Validator App / Baton scheduler
-    participant P as App bounded planning task
-    par Report collection and planning
-        N-->>L: Exact leader window context through proposed integration
-        L-->>V: Authenticated window announcement
-        loop Valid reports before snapshot closure
-            V->>V: Preserve started prefix F and sort eligible pending
-            V-->>L: Signed intended order for exact context
-            L->>L: Validate and admit each identity at most once
+    participant N as Native proposal owner
+    participant L as Leader BatonAlignment
+    participant V as Validator BatonAlignment
+    par App report window
+        N-->>L: [X] leader_context() -> LeaderContext
+        L->>L: [A] Fix window context and deadline
+        L-->>V: wire: WindowAnnouncement(context, deadline)
+        loop Valid reports admitted before closure
+            V->>V: [A] Snapshot intended order from F and pending
+            V-->>L: wire: SignedReport(context, intended_order)
+            L->>L: [A] Authenticate and retain distinct report
         end
-        L->>L: Close once at first 4f+1 admissions or fixed deadline
-        alt No reports admitted
-            L->>L: No prepared candidate from empty snapshot
-        else Nonempty report snapshot
-            L->>P: Frozen original reports and bounded admissible candidate set
-            P-->>L: Completed evaluation or unfinished result
-            opt Valid evaluated direction prepared
-                L-->>V: Authenticated advisory direction
-                V->>V: Validate and update permitted scheduling decisions
+        L->>L: [A] Freeze snapshot at threshold or deadline
+        alt Empty frozen snapshot
+            Note over L,N: No prepared direction, valid native base before adoption
+        else Nonempty FrozenReports
+            L->>L: [A] Evaluate directions within the fixed budget
+            opt Current, valid PreparedDirection
+                L-->>V: wire: SignedDirection(context, order)
+                V->>V: [A] Validate direction and permitted pending changes
             end
         end
-        Note over L,V: No direction vote / ACK / Ready quorum
-    and Native cut
-        N->>N: Continue native proposal processing
-        Note over N,L: Never wait for report count, deadline or planning
+    and Independent native cut
+        N->>N: Native construction and voting
+        Note over N,L: Never await report count, deadline, planning or direction ACK
     end
+    Note over L,V: Internal processing, no additional SDK methods
+    Note over L,V: Wire schemas are App design placeholders, no Ready quorum

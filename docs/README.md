@@ -1,27 +1,19 @@
-# Baton Docs
+# Baton docs: start here
 
-**Understand the components, their responsibilities and what they exchange; then follow the same connections through the E2E flows.** One App connects to the existing Multimmit Engine and Marshal. Inside App, the pool, Alignment, Executor, result processing and Storage each own a part of that flow.
+**Read [01. Architecture](01-overview/01-architecture.md) first.** It shows how one App connects to the existing Multimmit Engine and Marshal, and where TxPool, Alignment, Executor and Storage fit inside App.
 
-## Read in this order
+## Reading order
 
-1. **Overview:** read [Architecture](overview/architecture.md) for the whole composition and [Roles and terminology](overview/glossary.md) for the identities used between components.
-2. **Components and communication:** follow the component pages below in menu order. Each explains its responsibility, communication partners, exchanged values and completion conditions. Detailed Rust declarations and backend investigations are linked reference material.
-3. **E2E flows:** start with [Transaction to durable state](e2e/normal.md), then follow body exchange, native finality, scheduling, certification and recovery cases as needed.
+The folders and filenames are numbered in reading order. Follow `01-overview`, then `02-components`, then `03-e2e`. Keep `04-reference` nearby for details when needed.
 
-## Components and their connections
+1. **`01-overview/` — understand the whole composition.** Read [Architecture](01-overview/01-architecture.md), then [terminology](01-overview/02-terminology.md) for the values passed between components.
+2. **`02-components/` — understand each responsibility and exchange.** Start with [Multimmit](02-components/01-multimmit.md) and follow files `01`–`12`: communication partners, inputs, outputs and completion conditions.
+3. **`03-e2e/` — follow the complete flow.** Start with [Transaction to durable state](03-e2e/01-transaction-to-state.md). Files `02`–`09` expand individual paths and recovery.
+4. **`04-reference/` — look up details as needed.** Consult [communication contracts](04-reference/01-communication-contracts.md), Rust signatures, backend research and development checks from the component and E2E links.
 
-| Component | Responsibility | Communication to understand |
-|---|---|---|
-| [Multimmit](consensus/README.md) | Producer lanes, DA and native consensus | Calls App's `Automaton`; publishes native activity and relay requests to Marshal |
-| [Marshal](consensus/block-body.md) | Full-block custody, exchange and ordered delivery | App uses its mailbox; Marshal sends indexed `Update`s and receives durable-application ACKs |
-| [App coordination](baton/README.md) | Callback intake, lifecycle, dispatch and retained Update ownership | Connects the component calls; retains delivery tokens until certified durability |
-| [TxPool](tx/interfaces.md) | Transaction admission, retention and selection | Receives transactions, supplies proposal batches and reconciles durable outcomes |
-| [Alignment](baton/direction.md) | Candidate admission, ordering reflection and next-work selection | `admit`, ordering-only `commit`, and internal `next` over the execution view |
-| [Executor](execution/README.md) | Transaction computation and in-memory checkpoints | Receives exact-parent jobs, returns StateChanges, reads cold state and installs durable checkpoints |
-| [Storage](execution/storage.md) | Pinned reads, roots, certified persistence and recovery | `read/submit/certify`; retained `Prepared/Committed/Failed` events |
-| [App result processing](execution/interfaces.md) | Direct-result signing and peer certificate collection | Combines direct execution evidence with prepared commitments and submits certificates to Storage |
+Within the component section, the order is **Multimmit → Marshal → App coordination and callbacks → TxPool → Alignment → Executor → Storage → result processing → state sync → P2P**. Once these responsibilities and exchanges are clear, continue to the first E2E page. Detailed type declarations can wait until you need them.
 
-[State sync](execution/state-sync.md) explains certified checkpoint handoff across these existing owners. [P2P](overview/networking.md) identifies the native and App message paths. These responsibilities can share concrete owners and handles; the table does not require one service or public trait per row.
+The [full contents](SUMMARY.md), filenames and site's previous/next links use this same order. `assets/` contains diagram renders and the generated Rust export; it is not a reading chapter.
 
 ## Before following E2E
 
@@ -31,10 +23,8 @@ Keep three completion boundaries in mind:
 - `Alignment::commit(ordered)` records finalized ordering immediately. `Storage::submit` and `certify` success mean accepted work or evidence.
 - `StorageEvent::Committed(applied)` establishes certified local durability, supplies Executor's next usable checkpoint and permits ACK of the covered Updates. Executor installation adds no ACK round.
 
-The E2E pages reuse the component names and communication contracts above. They add timing, concurrency, retries and failure paths. The [complete contents](SUMMARY.md) and generated previous/next links follow the same reading order.
-
-## Reference and document status
-
-Use [Communication contracts and type details](overview/interfaces.md) for exact inputs, outputs, trait visibility and invariants, and [Existing Rust signatures](overview/rust-interfaces.md) for source-grounded Commonware declarations. QMDB, pool backend research, baseline comparisons and development checks follow the E2E section as reference material. Markdown is canonical; the site and Rust export are generated from it.
+## Document status
 
 These pages describe a proposed App connected to native source at `6233438985d8249d2b2bc1204191d5d405652288`. App implementation, protected-prefix Baton native integration, E2E execution and performance results remain incomplete. Pre-cut and Baton share the App execution/storage contracts; full Baton additionally needs authenticated native policy adoption, preservation and recovery. Backend, comparator, wire and resource policies remain open. The Bank application model remains outside scope.
+
+Markdown is canonical; the site and Rust export are generated from it. See [sources and document status](04-reference/09-sources.md) for evidence and historical material.

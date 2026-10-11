@@ -1,4 +1,4 @@
-// @generated from docs/overview/rust-interfaces.md; edit that Markdown source.
+// @generated from docs/04-reference/02-rust-signatures.md; edit that Markdown source.
 // Existing Commonware API excerpts; not standalone declarations or protocol implementation.
 
 // Existing commonware_consensus::Automaton method excerpts.

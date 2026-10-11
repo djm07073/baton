@@ -2,6 +2,12 @@
 
 Updated 2026-10-11. The newest decision below supersedes earlier architecture entries; those entries preserve research and publication history. Research/specification work only; no completed Baton native integration proof or application E2E results.
 
+## 2026-10-11 Numbered documentation layout
+
+Start at [Architecture](docs/01-overview/01-architecture.md). The 32 subject pages now live under `docs/01-overview/`, `02-components/`, `03-e2e/` and `04-reference/`, with numbered filenames matching SUMMARY.md and site navigation. Read component responsibilities and communication before the first E2E flow; consult reference pages as needed. Certification and state import now precede startup/recovery in the E2E sequence. The root docs README is the single reading guide.
+
+Current contracts are in docs/04-reference/01-communication-contracts.md; native Rust excerpts are in docs/04-reference/02-rust-signatures.md; Storage is described in docs/02-components/09-storage.md. Local links, the compatibility entry point, Rust export tools and diagram source-page metadata follow the new paths. The original split map retains its section/provenance evidence with current destination paths. Historical review records and publication URLs retain their recorded scope and paths. All code fences, 19 Mermaid sources and 38 blank policy choices are preserved; this changes document navigation, not the design contracts.
+
 ## 2026-10-11 Component reading order
 
 The current docs reading path is overview → component responsibilities and communication → E2E flows → reference/development. Component pages lead with ownership, communication direction, values and completion conditions. Executor, Storage and App result processing are described separately; the Storage page is docs/execution/storage.md. The detailed canonical contract remains docs/overview/interfaces.md, now a communication reference after E2E in navigation. Existing Rust declarations and backend surveys are reference material. SUMMARY.md, the start page and generated previous/next navigation use the same order. The documentation now has 33 content pages; all 19 Mermaid sources and the proposed trait contracts are unchanged by this readability edit.
@@ -92,7 +98,7 @@ The 31 active docs pages now use English, including navigation and diagram label
 
 ## Rust 인터페이스 진입점
 
-사용자가 Rust 인터페이스를 찾기 어렵다고 지적하여 [Rust 인터페이스](docs/overview/rust-interfaces.md)를 목차 상단과 시작 페이지에 배치했다. 기존 9개 trait 선언은 이 페이지를 원본으로 모으고 레이어별 상세 계약은 선언의 해당 anchor를 연결한다. 선언 본문은 그대로 유지했다. [단일 Rust 파일](docs/assets/interfaces/baton.rs)은 이 페이지에서 생성하며 문법을 확인했다. 실제 서비스 구현·프로토콜 검증을 수행한 것은 아니다.
+사용자가 Rust 인터페이스를 찾기 어렵다고 지적하여 [Rust 인터페이스](docs/04-reference/02-rust-signatures.md)를 목차 상단과 시작 페이지에 배치했다. 기존 9개 trait 선언은 이 페이지를 원본으로 모으고 레이어별 상세 계약은 선언의 해당 anchor를 연결한다. 선언 본문은 그대로 유지했다. [단일 Rust 파일](docs/assets/interfaces/baton.rs)은 이 페이지에서 생성하며 문법을 확인했다. 실제 서비스 구현·프로토콜 검증을 수행한 것은 아니다.
 
 문서는 현재 31개 본문 페이지다. GitHub 반영과 GitBook 업로드를 각각 확인했으며, GitBook에는 목차용 섹션 안내 7개도 둔다.
 

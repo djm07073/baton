@@ -139,18 +139,18 @@
   ],
   "origin_snapshot_sha256": "79d5a7109a685d8b8c968bcc92b135fad290a70dc62a8c95f064128c919ff74b",
   "source_pages": [
-    "baselines/precut.md",
-    "consensus/README.md",
-    "e2e/block-body.md",
-    "e2e/canonical.md",
-    "e2e/leader.md",
-    "e2e/native-consensus.md",
-    "e2e/normal.md",
-    "e2e/recovery.md",
-    "e2e/reschedule.md",
-    "e2e/results.md",
-    "e2e/state-sync.md",
-    "execution/qmdb.md",
-    "overview/architecture.md"
+    "01-overview/01-architecture.md",
+    "02-components/01-multimmit.md",
+    "03-e2e/01-transaction-to-state.md",
+    "03-e2e/02-block-exchange.md",
+    "03-e2e/03-native-consensus.md",
+    "03-e2e/04-leader-reports.md",
+    "03-e2e/05-direction-and-execution.md",
+    "03-e2e/06-ordered-application.md",
+    "03-e2e/07-result-certification.md",
+    "03-e2e/08-state-import.md",
+    "03-e2e/09-startup-and-recovery.md",
+    "04-reference/03-qmdb.md",
+    "04-reference/06-precut-baseline.md"
   ]
 }

@@ -11,7 +11,7 @@
   "pages": [
     {
       "group": "전체 구조",
-      "path": "overview/architecture.md",
+      "path": "01-overview/01-architecture.md",
       "title": "전체 아키텍처",
       "original_sections": [
         "1.1",
@@ -23,7 +23,7 @@
     },
     {
       "group": "전체 구조",
-      "path": "overview/glossary.md",
+      "path": "01-overview/02-terminology.md",
       "title": "역할과 공통 용어",
       "original_sections": [
         "1.3"
@@ -32,7 +32,7 @@
     },
     {
       "group": "전체 구조",
-      "path": "overview/networking.md",
+      "path": "02-components/12-networking.md",
       "title": "P2P와 메시지 경로",
       "original_sections": [
         "1.6"
@@ -41,7 +41,7 @@
     },
     {
       "group": "전체 구조",
-      "path": "overview/interfaces.md",
+      "path": "04-reference/01-communication-contracts.md",
       "title": "인터페이스 읽는 방법",
       "original_sections": [
         "1.7"
@@ -50,7 +50,7 @@
     },
     {
       "group": "Tx 레이어",
-      "path": "tx/README.md",
+      "path": "04-reference/04-pool-backends.md",
       "title": "Tx 레이어: 역할과 동작",
       "original_sections": [
         "3.1",
@@ -61,7 +61,7 @@
     },
     {
       "group": "Tx 레이어",
-      "path": "tx/interfaces.md",
+      "path": "02-components/06-tx-pool.md",
       "title": "Tx 인터페이스",
       "original_sections": [
         "3.2"
@@ -70,7 +70,7 @@
     },
     {
       "group": "Consensus 레이어",
-      "path": "consensus/README.md",
+      "path": "02-components/01-multimmit.md",
       "title": "Consensus: 역할과 native 구조",
       "original_sections": [
         "4.1",
@@ -80,7 +80,7 @@
     },
     {
       "group": "Consensus 레이어",
-      "path": "consensus/block-body.md",
+      "path": "02-components/02-marshal-custody.md",
       "title": "블록 생성과 Block body 송수신",
       "original_sections": [
         "4.2",
@@ -91,7 +91,7 @@
     },
     {
       "group": "Consensus 레이어",
-      "path": "consensus/ordered-input.md",
+      "path": "02-components/03-marshal-delivery.md",
       "title": "확정 실행 순서 전달",
       "original_sections": [
         "4.5"
@@ -100,7 +100,7 @@
     },
     {
       "group": "Consensus 레이어",
-      "path": "consensus/decisions.md",
+      "path": "04-reference/05-native-open-decisions.md",
       "title": "Consensus 미결정 사항",
       "original_sections": [
         "4.7"
@@ -109,7 +109,7 @@
     },
     {
       "group": "Baton 레이어",
-      "path": "baton/README.md",
+      "path": "02-components/04-app-coordination.md",
       "title": "Baton: 역할과 report 경로",
       "original_sections": [
         "5.1",
@@ -119,7 +119,7 @@
     },
     {
       "group": "Baton 레이어",
-      "path": "baton/direction.md",
+      "path": "02-components/07-alignment.md",
       "title": "Direction 선택과 재실행",
       "original_sections": [
         "5.4",
@@ -131,7 +131,7 @@
     },
     {
       "group": "Baton 레이어",
-      "path": "baton/interfaces.md",
+      "path": "02-components/05-app-callbacks.md",
       "title": "Baton 인터페이스와 로컬 진행 알림",
       "original_sections": [
         "5.2",
@@ -141,7 +141,7 @@
     },
     {
       "group": "Execution 레이어",
-      "path": "execution/README.md",
+      "path": "02-components/08-executor.md",
       "title": "Execution: 역할과 책임",
       "original_sections": [
         "6.1",
@@ -151,7 +151,7 @@
     },
     {
       "group": "Execution 레이어",
-      "path": "execution/interfaces.md",
+      "path": "02-components/10-result-processing.md",
       "title": "Executor·Runtime·결과 인증 인터페이스",
       "original_sections": [
         "6.2",
@@ -161,7 +161,7 @@
     },
     {
       "group": "Execution 레이어",
-      "path": "execution/qmdb.md",
+      "path": "04-reference/03-qmdb.md",
       "title": "QMDB 분기·재사용·상태 적용",
       "original_sections": [
         "6.3",
@@ -172,7 +172,7 @@
     },
     {
       "group": "Execution 레이어",
-      "path": "execution/state-sync.md",
+      "path": "02-components/11-state-sync.md",
       "title": "State sync: 인증된 실행 결과로 상태 동기",
       "original_sections": [
         "6.7"
@@ -181,7 +181,7 @@
     },
     {
       "group": "E2E 케이스",
-      "path": "e2e/normal.md",
+      "path": "03-e2e/01-transaction-to-state.md",
       "title": "정상 흐름: tx 접수부터 상태 적용까지",
       "original_sections": [
         "2.1",
@@ -191,7 +191,7 @@
     },
     {
       "group": "E2E 케이스",
-      "path": "e2e/block-body.md",
+      "path": "03-e2e/02-block-exchange.md",
       "title": "Block body 송수신",
       "original_sections": [
         "2.3",
@@ -201,7 +201,7 @@
     },
     {
       "group": "E2E 케이스",
-      "path": "e2e/native-consensus.md",
+      "path": "03-e2e/03-native-consensus.md",
       "title": "블록 제안·DA·cut 확정",
       "original_sections": [
         "2.14"
@@ -210,7 +210,7 @@
     },
     {
       "group": "E2E 케이스",
-      "path": "e2e/leader.md",
+      "path": "03-e2e/04-leader-reports.md",
       "title": "Leader report·direction과 proposal 경합",
       "original_sections": [
         "2.5",
@@ -220,7 +220,7 @@
     },
     {
       "group": "E2E 케이스",
-      "path": "e2e/reschedule.md",
+      "path": "03-e2e/05-direction-and-execution.md",
       "title": "Direction 수신과 재실행",
       "original_sections": [
         "2.6"
@@ -229,7 +229,7 @@
     },
     {
       "group": "E2E 케이스",
-      "path": "e2e/canonical.md",
+      "path": "03-e2e/06-ordered-application.md",
       "title": "확정 순서와 canonical 상태 적용",
       "original_sections": [
         "2.7",
@@ -239,7 +239,7 @@
     },
     {
       "group": "E2E 케이스",
-      "path": "e2e/recovery.md",
+      "path": "03-e2e/09-startup-and-recovery.md",
       "title": "시작·재시작과 이력 복구",
       "original_sections": [
         "2.12",
@@ -249,7 +249,7 @@
     },
     {
       "group": "E2E 케이스",
-      "path": "e2e/results.md",
+      "path": "03-e2e/07-result-certification.md",
       "title": "Executor 간 결과 인증과 조회",
       "original_sections": [
         "2.10"
@@ -258,7 +258,7 @@
     },
     {
       "group": "E2E 케이스",
-      "path": "e2e/state-sync.md",
+      "path": "03-e2e/08-state-import.md",
       "title": "State sync: 인증된 실행 결과로 상태 동기",
       "original_sections": [
         "2.13"
@@ -267,7 +267,7 @@
     },
     {
       "group": "개발·참고자료",
-      "path": "reference/integration.md",
+      "path": "04-reference/07-development-order.md",
       "title": "Commonware 연결 지점과 개발 순서",
       "original_sections": [
         "7.1",
@@ -277,7 +277,7 @@
     },
     {
       "group": "개발·참고자료",
-      "path": "reference/verification.md",
+      "path": "04-reference/08-verification.md",
       "title": "검증할 케이스",
       "original_sections": [
         "7.3"
@@ -286,7 +286,7 @@
     },
     {
       "group": "개발·참고자료",
-      "path": "reference/sources.md",
+      "path": "04-reference/09-sources.md",
       "title": "참고자료와 문서 상태",
       "original_sections": [
         "8"

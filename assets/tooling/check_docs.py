@@ -65,10 +65,10 @@ def main():
                     else:
                         decisions += 1
     directory = docs / 'assets/diagrams'
-    rust_page = (docs / 'overview/rust-interfaces.md').read_text()
+    rust_page = (docs / '04-reference/02-rust-signatures.md').read_text()
     declarations = re.findall(r'```rust,ignore\n([\s\S]*?)\n```', rust_page)
     exported = (docs / 'assets/interfaces/baton.rs').read_text()
-    expected = ('// @generated from docs/overview/rust-interfaces.md; edit that Markdown source.\n'
+    expected = ('// @generated from docs/04-reference/02-rust-signatures.md; edit that Markdown source.\n'
                 '// Existing Commonware API excerpts; not standalone declarations or protocol implementation.\n\n'
                 + '\n\n'.join(declarations) + '\n')
     if exported != expected:

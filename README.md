@@ -1,12 +1,12 @@
 # Baton
 
-Read and edit the implementation design in **[Baton Docs](docs/README.md)**. The [table of contents](docs/SUMMARY.md) follows overview → component responsibilities and communication → E2E flows → reference material. The integration starts with one App connected to the existing Multimmit Engine and Marshal.
+Start with **[Architecture](docs/01-overview/01-architecture.md)**. The implementation docs are organized in reading order: `docs/01-overview/` → `docs/02-components/` → `docs/03-e2e/`; use `docs/04-reference/` for details. The [reading guide](docs/README.md) and [full contents](docs/SUMMARY.md) follow the same order. The integration starts with one App connected to the existing Multimmit Engine and Marshal.
 
 | Start here | Covers |
 |---|---|
 | [Implementation docs](docs/README.md) · [Contents](docs/SUMMARY.md) | App-owned pool/schedulers/execution, existing native connections, E2E flows and open decisions |
-| [Rust interfaces](docs/overview/rust-interfaces.md) · [Single Rust file](docs/assets/interfaces/baton.rs) | Existing Commonware API excerpts for Automaton, Relay, Reporter and Marshal |
-| [Pre-cut baseline implementation](docs/baselines/precut.md) · [GitBook](https://app.gitbook.com/s/pvyFEde12m2tVRjI8TRw/baselines/precut) | Separate App scheduler mode without Baton: speculation, native ordering and incremental repair |
+| [Rust interfaces](docs/04-reference/02-rust-signatures.md) · [Single Rust file](docs/assets/interfaces/baton.rs) | Existing Commonware API excerpts for Automaton, Relay, Reporter and Marshal |
+| [Pre-cut baseline implementation](docs/04-reference/06-precut-baseline.md) · [GitBook](https://app.gitbook.com/s/pvyFEde12m2tVRjI8TRw/baselines/precut) | Separate App scheduler mode without Baton: speculation, native ordering and incremental repair |
 | [Research paper draft](baton-paper.md) | Algorithm, conditional safety/reuse arguments, native integration obligations, evaluation plan |
 
 The [GitBook Baton space](https://app.gitbook.com/o/Z5g7kwPjokG0jEOyXNu6/s/pvyFEde12m2tVRjI8TRw/) is private within Beaker. [Rust interfaces](https://app.gitbook.com/s/pvyFEde12m2tVRjI8TRw/overview/rust-interfaces) is a direct entry point. This App-owned integration rewrite has not been published there; read docs/ for the current design. Git Sync and automatic Google Docs synchronization are not configured.

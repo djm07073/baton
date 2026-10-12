@@ -139,7 +139,7 @@ Cloned callback handles route to the same App state. For `propose` and `verify`,
 
 ```mermaid
 flowchart TB
-    P["[C] Automaton::propose(context)"] --> S["[A] pool.select<br/>retain stable bounded bytes"]
+    P["[C] Automaton::propose(context)"] --> S["[A] TxPool::select(context, limits)<br/>epoch/lane → eligible type pools<br/>pack ready txs, preserve retained bytes"]
     S --> B["[C] TransactionBlock::from_context"]
     B --> M["[C] Marshal.stage_block<br/>await acceptance"]
     M --> R["[C] digest_reply.send(body_digest)"]
@@ -148,7 +148,7 @@ flowchart TB
 
 [Open full-size diagram](../docs/assets/diagrams/diagram-49.svg) · [PNG](../docs/assets/diagrams/diagram-49.png)
 
-Selection and proposal do not retire transactions; cleanup follows canonical durable outcomes.
+Execution projects the native proposal epoch/lane into `SelectionContext`; TxPool resolves eligible types and returns the bounded Payload. Type buckets and assignment policy stay inside TxPool. Selection and proposal preserve all retained types for sharing; cleanup follows canonical durable outcomes.
 
 `stage_block(...).await` accepts custody work; the returned custody handle is the later durable-completion boundary. `put_block(...).await` combines staging and waiting. The native local `verify` must confirm validity and durable custody before local signing. If App promises durability earlier in its own propose implementation it may wait there, but selecting a batch or accepting staging alone is not a disk flush.
 

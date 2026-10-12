@@ -1,7 +1,8 @@
 //! Pool inputs supplied by Network and Execution, without importing their internals.
 
 /// Trusted epoch, local producer lane, producer-lane set and shared assignment rule.
-/// MODEL-01: a node without a producer lane retains valid transactions as Unselected.
+/// MODEL-01/POOL-01: define epoch/lane transaction-type eligibility; bucket layout stays internal.
+/// MODEL-01: eligibility applies at selection; even non-producers retain and share valid input.
 /// Spec: README.md#pool-lane-context-and-sharing
 pub struct LaneContext {
     _private: (),

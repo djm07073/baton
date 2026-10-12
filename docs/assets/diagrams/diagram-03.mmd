@@ -3,31 +3,37 @@ sequenceDiagram
     participant A as Execution / Network ingress
     participant P as Local TxPool
     participant Q as Peer Network / TxPool
+    participant N as Multimmit Engine
     participant W as Execution canonical owner
     C->>A: wire: Transaction(tx)
     A->>P: [A] TxPool::admit(tx)
     P->>P: Validate transaction and exact duplicate identity
     alt Invalid transaction
-        P-->>A: Ok(Admission): Invalid, duplicate = false
+        P-->>A: Err(AdmissionError::Invalid)
         Note over A,P: No retained payload or peer relay
     else Already-retained valid transaction
-        P-->>A: Ok(Admission): current local class, duplicate = true
+        P-->>A: Ok(Admission): duplicate = true
         Note over A,P: No reinsertion or immediate relay loop
     else Valid new transaction, capacity unavailable
         P-->>A: Err(AdmissionError::Backpressure)
         Note over A,P: Caller keeps tx for retry, no successful retention claim
     else New valid transaction can be retained
-        P->>P: Retain Selected for own lane, Unselected for other lanes
-        P-->>A: Ok(Admission): local classification, duplicate = false
-        A-->>Q: wire: Transaction(tx), both valid classes
-        Q->>Q: [A] TxPool::admit(tx), classify under peer's own lane context
-        Note over P,Q: The same tx may be Selected here and Unselected there
+        P->>P: Retain by transaction type regardless of local lane eligibility
+        P-->>A: Ok(Admission): duplicate = false
+        A-->>Q: wire: Transaction(tx), all retained types
+        Q->>Q: [A] TxPool::admit(tx), validate and retain by type
+        Note over P,Q: Type-to-lane assignment only affects proposal selection
     end
     A-->>C: Admission result under the ingress contract
+    N->>A: [C] Automaton::propose(ctx)
+    A-->>N: Receiver[BodyDigest]
     A->>P: [A] TxPool::select(ctx, limits)
-    P-->>A: Payload from this lane's ready Selected entries
-    Note over A,P: Selection preserves bytes, Unselected stays retained and shared
+    P->>P: Choose eligible type pools for epoch/lane, pack ready transactions
+    P-->>A: Payload with stable bounded bytes
+    A->>A: [C] TransactionBlock::from_context(ctx, body)
+    Note over A,N: Staging and digest reply follow the full E2E path above
+    Note over A,P: All types stay retained and shared across selection and epoch changes
     W->>W: [A] app.publish_applied(DurableApplied)
     W-->>P: [A] TxPool::reconcile(PoolUpdate)
-    P->>P: Reconcile both classes from durable outcomes of any lane
+    P->>P: Reconcile type pools from durable outcomes of any lane
     Note over W,P: Pool maintenance does not gate canonical ACK

@@ -1,6 +1,6 @@
 {
   "specification": "Baton docs Mermaid sources",
-  "specification_sha256": "0cde17ad5e80fc678878fdfdd49e398f53116c71e1f4d2ba9da9b7830e6baea6",
+  "specification_sha256": "b2fb52eb62c7e48f462ede7eb9df9460e481e16414420e460e31dd234dd65156",
   "renderer": "mermaid 11.12.0",
   "diagrams": [
     {
@@ -14,15 +14,15 @@
       "name": "diagram-02",
       "title": "Full E2E: transaction input to canonical state",
       "width": 1559,
-      "height": 3553,
-      "source_sha256": "6979b1b187cb3f0669a1543ebea35d6bbc7103a5b418b0eaf54a5a75e15e1d61"
+      "height": 3661,
+      "source_sha256": "07922f5deff668b9777eaf5c294d8030ece1c16a32fe850842067f804375b39e"
     },
     {
       "name": "diagram-03",
       "title": "Tx lifecycle: new, duplicate, and invalid transactions",
-      "width": 1125,
-      "height": 1981,
-      "source_sha256": "caf8895ef398f23ff6d3d1aa885e03f078965f872a580c232834470b308727c2"
+      "width": 1338,
+      "height": 2292,
+      "source_sha256": "6ec762ab2ee1f3c04fcd428384c615acf843357217bbce8029362eab4af7003e"
     },
     {
       "name": "diagram-04",
@@ -188,9 +188,9 @@
     {
       "name": "diagram-27",
       "title": "Transaction lifecycle",
-      "width": 1072,
-      "height": 1885,
-      "source_sha256": "5a70d8b44bd62f186d7460ef7c14d60c889cd73d536a7e9ca9dadce0f45243a4"
+      "width": 1220,
+      "height": 1661,
+      "source_sha256": "24a3efbde2446c98d360b5419b8bbb4e82a49bf0fd10f7c8e047bf12b7d14a58"
     },
     {
       "name": "diagram-28",
@@ -232,14 +232,14 @@
       "title": "Separate message planes",
       "width": 818,
       "height": 533,
-      "source_sha256": "cb109cb89709736b096cda824d2dab196518d90130f386a4208eeffc92ff926f"
+      "source_sha256": "a3679a8f20bb249ca4f1970f23dcf07241ac9a4a9627ec65686ca13cb93f1999"
     },
     {
       "name": "diagram-34",
       "title": "Whole path at a glance",
       "width": 613,
-      "height": 1010,
-      "source_sha256": "98a80f2a091a021a26733139dc17ed06b1b85653b72ef62d4086a84a490d8b90"
+      "height": 1314,
+      "source_sha256": "c5ee9015ab8bd91f9cdc09d0f27761e1d5a1c8c8b1d3e162bd1ed7c37edcc829"
     },
     {
       "name": "diagram-35",
@@ -343,8 +343,8 @@
       "name": "diagram-49",
       "title": "Automaton::propose: pool to staged block",
       "width": 348,
-      "height": 810,
-      "source_sha256": "1cc278ba27cd6a15ff11214164e995a4260ef8bfb3fb898adb1ffa8768ae6f59"
+      "height": 906,
+      "source_sha256": "857b1d4b1502f0a60a09ab2bafe2208b3ea88cd52ddcb21f4369526f7bb24e63"
     },
     {
       "name": "diagram-50",

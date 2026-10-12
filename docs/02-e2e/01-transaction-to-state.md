@@ -8,7 +8,10 @@
 
 ```mermaid
 flowchart TB
-    T["Transaction"] -->|"[A] pool.admit / select"| B["[C] Automaton::propose<br/>stage full block"]
+    T["Transaction"] -->|"[A] TxPool::admit"| P["Retain by type + share"]
+    N0["Multimmit"] -->|"[C] Automaton::propose(context)"| S["[A] TxPool::select<br/>epoch/lane → eligible types → Payload"]
+    P -.->|"retained transactions"| S
+    S --> B["Execution builds block<br/>[C] Marshal.stage_block"]
     B --> V["[C] Automaton::verify<br/>validity + durable custody"]
     V -->|"eligible candidate"| X["[P] Alignment::admit / AlignmentPolicy::next<br/>early execution"]
     V --> N["Native signing / DA / finality"]
@@ -44,12 +47,13 @@ sequenceDiagram
     participant S as Storage
     C-->>A: wire: Transaction(tx)
     A->>P: [A] pool.admit(tx)
-    P-->>A: Ok(Admission): Selected, duplicate = false
+    P-->>A: Ok(Admission): duplicate = false
     A-->>C: Admission: valid transaction retained
-    Note over A,P: Both valid classes are shared, detailed admission cases follow below
+    Note over A,P: Retain by type and share across lanes, detailed admission cases follow below
     N->>A: [C] Automaton::propose(ctx).await
     A-->>N: Receiver[BodyDigest]
     A->>P: [A] pool.select(ctx, limits)
+    P->>P: Resolve eligible types for epoch/lane and pack ready transactions
     P-->>A: Payload
     A->>A: [C] TransactionBlock::from_context(ctx, body)
     A->>M: [C] stage_block(block).await
@@ -121,33 +125,39 @@ sequenceDiagram
     participant A as Execution / Network ingress
     participant P as Local TxPool
     participant Q as Peer Network / TxPool
+    participant N as Multimmit Engine
     participant W as Execution canonical owner
     C->>A: wire: Transaction(tx)
     A->>P: [A] TxPool::admit(tx)
     P->>P: Validate transaction and exact duplicate identity
     alt Invalid transaction
-        P-->>A: Ok(Admission): Invalid, duplicate = false
+        P-->>A: Err(AdmissionError::Invalid)
         Note over A,P: No retained payload or peer relay
     else Already-retained valid transaction
-        P-->>A: Ok(Admission): current local class, duplicate = true
+        P-->>A: Ok(Admission): duplicate = true
         Note over A,P: No reinsertion or immediate relay loop
     else Valid new transaction, capacity unavailable
         P-->>A: Err(AdmissionError::Backpressure)
         Note over A,P: Caller keeps tx for retry, no successful retention claim
     else New valid transaction can be retained
-        P->>P: Retain Selected for own lane, Unselected for other lanes
-        P-->>A: Ok(Admission): local classification, duplicate = false
-        A-->>Q: wire: Transaction(tx), both valid classes
-        Q->>Q: [A] TxPool::admit(tx), classify under peer's own lane context
-        Note over P,Q: The same tx may be Selected here and Unselected there
+        P->>P: Retain by transaction type regardless of local lane eligibility
+        P-->>A: Ok(Admission): duplicate = false
+        A-->>Q: wire: Transaction(tx), all retained types
+        Q->>Q: [A] TxPool::admit(tx), validate and retain by type
+        Note over P,Q: Type-to-lane assignment only affects proposal selection
     end
     A-->>C: Admission result under the ingress contract
+    N->>A: [C] Automaton::propose(ctx)
+    A-->>N: Receiver[BodyDigest]
     A->>P: [A] TxPool::select(ctx, limits)
-    P-->>A: Payload from this lane's ready Selected entries
-    Note over A,P: Selection preserves bytes, Unselected stays retained and shared
+    P->>P: Choose eligible type pools for epoch/lane, pack ready transactions
+    P-->>A: Payload with stable bounded bytes
+    A->>A: [C] TransactionBlock::from_context(ctx, body)
+    Note over A,N: Staging and digest reply follow the full E2E path above
+    Note over A,P: All types stay retained and shared across selection and epoch changes
     W->>W: [A] app.publish_applied(DurableApplied)
     W-->>P: [A] TxPool::reconcile(PoolUpdate)
-    P->>P: Reconcile both classes from durable outcomes of any lane
+    P->>P: Reconcile type pools from durable outcomes of any lane
     Note over W,P: Pool maintenance does not gate canonical ACK
 ```
 
@@ -155,6 +165,6 @@ sequenceDiagram
 
 </details>
 
-`admit` and `select` name TxPool operations called by Execution, not a new public consensus trait. Selected, Unselected and Invalid are local transaction classes. Both valid classes are retained and shared; only Selected feeds the local lane's proposals. RPC and peer ingress recompute the class locally. Duplicate metadata and backpressure are separate from classification; physical representation and the routing algorithm remain open. Duplicate suppression in one pool does not establish global exactly-once execution when multiple producers include the same transaction.
+`admit` validates, deduplicates and retains transactions by type independently of lane eligibility. `Automaton::propose` triggers Execution to call `TxPool::select`, which resolves eligible type pools from the epoch/lane and returns a bounded Payload. All retained types remain shared; proposal eligibility is not a stored transaction class. Duplicate metadata, invalid input and retryable backpressure are separate admission outcomes. Type assignment and physical storage remain developer-owned choices. Duplicate suppression in one pool does not establish global exactly-once execution when multiple producers include the same transaction.
 
 See [transaction admission and selection](../../tx-pool/README.md#pool) for the TxPool contract, the [backend survey](../03-reference/04-pool-backends.md) for reuse options, and [canonical application](06-ordered-application.md) for durable outcome handling. The node assembly is grounded in the current [log-multimmit example](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/examples/log-multimmit/src/node.rs#L242); its synthetic payload generator does not implement this transaction application.

@@ -1,15 +1,14 @@
 flowchart TB
     I["Client / peer Transaction(tx)"] -->|"[A] TxPool::admit"| V{"Transaction valid?"}
-    V -->|"No"| X["Invalid<br/>no payload retention or relay"]
+    V -->|"No"| X["AdmissionError::Invalid<br/>no payload retention or relay"]
     V -->|"Yes"| D{"Exact valid tx already retained?"}
-    D -->|"Yes"| K["Admission: current local class<br/>duplicate = true<br/>no reinsertion or relay loop"]
+    D -->|"Yes"| K["Admission: duplicate = true<br/>already retained"]
     D -->|"No"| R{"Retention available?"}
     R -->|"No"| F["AdmissionError::Backpressure<br/>caller retains for retry"]
-    R -->|"Yes"| L{"Assigned to local producer lane?"}
-    L -->|"Yes"| S["Selected<br/>retain transaction"]
-    L -->|"No / no local lane"| U["Unselected<br/>retain transaction"]
-    S --> G["Network shares both valid classes<br/>wire: Transaction(tx)"]
-    U --> G
-    S -->|"[A] TxPool::select<br/>ready entries within limits"| B["Payload for local proposal"]
-    B -->|"[C] TransactionBlock::from_context"| P["Producer block"]
-    G --> Q["Peer TxPools<br/>validate and classify locally"]
+    R -->|"Yes"| T["Retain by type<br/>Admission: duplicate = false"]
+    T -->|"wire: Transaction(tx)<br/>all retained types"| Q["Peer TxPools<br/>[A] TxPool::admit"]
+    N["Multimmit"] -->|"[C] Automaton::propose(context)"| E["Execution"]
+    E -->|"[A] TxPool::select(context, limits)"| S["Resolve eligible types for epoch/lane<br/>pack ready txs within limits"]
+    T -.->|"retained type pools"| S
+    S -->|"Payload"| B["Execution<br/>[C] TransactionBlock::from_context"]
+    B --> P["Producer block"]

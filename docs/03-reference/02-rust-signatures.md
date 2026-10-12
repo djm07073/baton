@@ -113,7 +113,7 @@ For Multimmit `Plan = ()`; `digest` is the full header/block identity. Marshal's
 
 ## Pool stays inside App
 
-Use concrete admission/selection functions. Admission applies bounded structural/static selected-or-unselected policy; selection packs retained selected candidates for `propose`. Selection and proposal do not establish canonical retirement. Canonical outcomes update the chosen pool backend internally. Backend, policy and P2P retention remain open. [Pool behavior](../../tx-pool/README.md#pool).
+Use concrete admission/selection functions. Admission validates and retains transactions by type independently of proposal eligibility. `Automaton::propose` calls into `TxPool::select` to resolve eligible type pools for the epoch/lane and pack a bounded Payload. Selection and proposal preserve retention and sharing. Canonical outcomes update the chosen pool backend internally. Backend, type-assignment policy and P2P retention remain developer-owned choices. [Pool behavior](../../tx-pool/README.md#pool).
 
 <a id="orderer"></a>
 <a id="planner"></a>

@@ -1,5 +1,8 @@
 flowchart TB
-    T["Transaction"] -->|"[A] pool.admit / select"| B["[C] Automaton::propose<br/>stage full block"]
+    T["Transaction"] -->|"[A] TxPool::admit"| P["Retain by type + share"]
+    N0["Multimmit"] -->|"[C] Automaton::propose(context)"| S["[A] TxPool::select<br/>epoch/lane → eligible types → Payload"]
+    P -.->|"retained transactions"| S
+    S --> B["Execution builds block<br/>[C] Marshal.stage_block"]
     B --> V["[C] Automaton::verify<br/>validity + durable custody"]
     V -->|"eligible candidate"| X["[P] Alignment::admit / AlignmentPolicy::next<br/>early execution"]
     V --> N["Native signing / DA / finality"]

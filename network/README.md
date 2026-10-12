@@ -17,7 +17,9 @@ Own configuration, construction, service lifetimes, startup readiness and superv
 
 Follow the [assembly sequence](../docs/03-reference/07-development-order.md#body-assembly-to-implement) and [startup/recovery E2E](../docs/02-e2e/09-startup-and-recovery.md). Construction parameters, backend/runtime policy and supervision remain NETWORK-01 work; `main` deliberately stops at `todo!()` until that contract is implemented.
 
-Network derives `LaneContext` from the trusted native epoch/producer configuration and the agreed routing rule, then constructs the pool with `TxPool::open(lanes)`. Supply the same context to proposal handling. Both valid classes remain available to transaction sharing; lane membership alone never justifies dropping input.
+Network derives `LaneContext` from the trusted native epoch/producer configuration and the agreed routing rule, then constructs the pool with `TxPool::open(lanes)`. Supply the same context to proposal handling. Admission retains valid transactions by type independently of local proposal eligibility; all retained types remain available for sharing.
+
+Native lane identity does not define transaction types. POOL-01 owns the epoch/lane-to-type selection policy; NETWORK-01 supplies its agreed configuration and epoch transitions. Type buckets and indexes remain internal to TxPool; see [lane context and sharing](../tx-pool/README.md#pool-lane-context-and-sharing).
 
 ## Implementation tasks and completion
 
@@ -134,7 +136,7 @@ When adding App observation, put it beside the supplied Marshal mailbox in `Repo
 
 <a id="marshal-custody-block-construction-and-body-exchange"></a>
 
-**App builds and validates transaction bodies; existing Multimmit Marshal stores and exchanges complete blocks.** Put the TxPool inside App. Selected transactions feed `Automaton::propose`; `Automaton::verify` obtains durable custody and makes valid eligible blocks available to the App scheduler.
+**App builds and validates transaction bodies; existing Multimmit Marshal stores and exchanges complete blocks.** Put the TxPool inside App. `Automaton::propose` triggers `TxPool::select` to choose eligible type pools from the epoch/lane and construct a body; `Automaton::verify` obtains durable custody and makes valid eligible blocks available to the App scheduler.
 
 <a id="marshal-custody-two-paths-for-the-same-block"></a>
 
@@ -204,7 +206,7 @@ The producer-header parent differs from the execution-state parent. Alignment/ex
 
 ### Select transactions and build a block
 
-1. Engine issues `propose(context)`. App selects a bounded batch from its pool's selected candidates, preserving transactions until internal canonical cleanup permits retirement.
+1. Engine issues `propose(context)`. App calls `TxPool::select` to choose eligible type pools for that epoch/lane and pack a bounded batch, preserving transactions until internal canonical cleanup permits retirement.
 2. App builds `TransactionBlock::from_context(context, body)` and calls `stage_block`. Successful staging admits storage work; the proposal receiver may return the **body digest** before all storage I/O finishes.
 3. Native constructs the same header and calls local `verify(context, body_digest)`. App waits on exact durable custody and validates the payload before resolving true. Native signs its header after this fence.
 4. Native calls the supplied Relay with the **header digest** and publishes the signed header on its data plane. Relay broadcasts the full staged block on the body channel.
@@ -370,14 +372,14 @@ flowchart LR
     end
     N1 <-->|"native headers / DA / proposals / proofs"| N2
     M1 <-->|"full blocks / backfill"| M2
-    P1 <-->|"wire: Transaction(tx)<br/>Selected + Unselected"| P2
+    P1 <-->|"wire: Transaction(tx)<br/>all retained types"| P2
     B1 <-->|"reports / advisory direction"| B2
     E1 <-->|"attestations / certificates / material"| E2
 ```
 
 [Open full-size diagram](../docs/assets/diagrams/diagram-33.svg) · [PNG](../docs/assets/diagrams/diagram-33.png)
 
-These are logical message owners; concrete App wire codecs and channel allocation remain open. Existing Commonware Sender/Receiver handles carry the traffic. Transaction transport shares both Selected and Unselected entries; each receiving TxPool independently validates and classifies them for its own lane. Invalid payloads are not relayed, and exact duplicate metadata suppresses repeated insertion and relay loops.
+These are logical message owners; concrete App wire codecs and channel allocation remain open. Existing Commonware Sender/Receiver handles carry the traffic. Transaction transport shares all retained types; each receiving TxPool independently validates and retains them by type. Epoch/lane eligibility is resolved only for proposal selection. Invalid payloads are not relayed, and exact duplicate metadata suppresses repeated insertion and relay loops.
 
 <a id="networking-responsibility-and-communication"></a>
 
@@ -397,7 +399,7 @@ Commonware transport supplies authenticated peer connections and registered chan
 | Native resolver | Native view proofs and recovery material | `3` |
 | Marshal resolver | Exact block/history/certificate backfill | `4` |
 | Marshal broadcast | Complete `TransactionBlock` values with header and body | `5` |
-| App transactions | Bounded messages / inventory covering both Selected and Unselected valid transactions | Undecided |
+| App transactions | Bounded messages / inventory covering retained valid transactions of all types | Undecided |
 | App Baton reports / direction | Signed intended-order reports, window context and advisory direction | Undecided |
 | App execution results / state sync | Exact statements, signatures, result certificates, material and queries | Undecided |
 
@@ -435,7 +437,7 @@ Bound complete encoded messages and outstanding requests/subscriptions, not only
 
 | Diagram label | Contract / definition |
 |---|---|
-| `Transaction(tx)` | Share both valid transaction classes under the [pool contract](../tx-pool/README.md#pool). The receiver recomputes validity and local lane classification; transport receipt is not retention or inclusion. |
+| `Transaction(tx)` | Share all retained types under the [pool contract](../tx-pool/README.md#pool). The receiver validates and retains by type independently of local proposal eligibility; transport receipt is not retention or inclusion. |
 | `WindowAnnouncement(context, deadline)` | Baton report-window context and fixed closure deadline under the [report rules](../alignment/README.md#alignment); authentication and exact context checks are required. |
 | `SignedReport(context, intended_order)` | Original authenticated intended-order report, counted once per eligible identity in the fixed window; not execution evidence. |
 | `SignedDirection(context, order)` | Authenticated advisory direction under the same context; [pending-order rules](../docs/02-e2e/05-direction-and-execution.md) constrain adoption. It does not establish native finality. |

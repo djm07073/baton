@@ -1,5 +1,5 @@
 flowchart TB
-    P["[C] Automaton::propose(context)"] --> S["[A] pool.select<br/>retain stable bounded bytes"]
+    P["[C] Automaton::propose(context)"] --> S["[A] TxPool::select(context, limits)<br/>epoch/lane → eligible type pools<br/>pack ready txs, preserve retained bytes"]
     S --> B["[C] TransactionBlock::from_context"]
     B --> M["[C] Marshal.stage_block<br/>await acceptance"]
     M --> R["[C] digest_reply.send(body_digest)"]

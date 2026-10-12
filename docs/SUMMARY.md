@@ -12,15 +12,13 @@
 * [Multimmit: native consensus](02-components/01-multimmit.md)
 * [Marshal: block custody and exchange](02-components/02-marshal-custody.md)
 * [Marshal: ordered delivery and ACK](02-components/03-marshal-delivery.md)
-* [App: coordination and ownership](02-components/04-app-coordination.md)
-* [App: native callbacks](02-components/05-app-callbacks.md)
-* [TxPool: admission and selection](02-components/06-tx-pool.md)
-* [Alignment: Pre-cut and Baton](02-components/07-alignment.md)
-* [Executor: execution and checkpoints](02-components/08-executor.md)
-* [Storage: reads and durable state](02-components/09-storage.md)
-* [Executor: result certification](02-components/10-result-processing.md)
-* [State sync: certified checkpoint handoff](02-components/11-state-sync.md)
-* [P2P: channels and messages](02-components/12-networking.md)
+* [App: Multimmit integration](02-components/04-app-coordination.md)
+* [TxPool: admission and selection](02-components/05-tx-pool.md)
+* [Alignment: Pre-cut and Baton](02-components/06-alignment.md)
+* [Executor: execution and checkpoints](02-components/07-executor.md)
+* [Storage: reads and durable state](02-components/08-storage.md)
+* [Result certification and state sync](02-components/09-result-processing.md)
+* [P2P: channels and messages](02-components/10-networking.md)
 
 ## 03. E2E flows
 

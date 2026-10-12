@@ -50,11 +50,11 @@ Blue boxes are existing components. Green boxes separate App pool, Alignment, Ex
 | [Multimmit](../02-components/01-multimmit.md) | Producer lanes, DA, views and native finality | Calls App Automaton; sends Activity and relay requests to Marshal |
 | [Marshal](../02-components/02-marshal-custody.md) | Full blocks, native history, backfill and ordered delivery | Custody mailbox calls; indexed Update and application ACK |
 | [App coordination](../02-components/04-app-coordination.md) | Callback intake, lifecycle, claimed dispatch and Update tokens | Connects pool, policy, execution, result processing and Storage |
-| [TxPool](../02-components/06-tx-pool.md) | Admission, retained candidates and bounded selection | Transactions in; proposal batches out; durable outcomes for maintenance |
-| [Alignment](../02-components/07-alignment.md) | Eligible pending work and finalized-order reflection | `admit/commit`; internal `next` selects an intent from the execution view |
-| [Executor](../02-components/08-executor.md) | Transaction computation, checkpoints and result certification | Exact-parent jobs, StateChanges, prepared roots, verified commit requests and checkpoint installation |
-| [Storage](../02-components/09-storage.md) | Roots, material checks, persistence and recovery | `read/submit/commit`; `Prepared/Committed/Failed` events |
-| [Executor result processing](../02-components/10-result-processing.md) | Signing and certificate verification inside Executor | Direct evidence + prepared state root + matching peer signatures → verified Storage commit request |
+| [TxPool](../02-components/05-tx-pool.md) | Admission, retained candidates and bounded selection | Transactions in; proposal batches out; durable outcomes for maintenance |
+| [Alignment](../02-components/06-alignment.md) | Eligible pending work and finalized-order reflection | `admit/commit`; internal `next` selects an intent from the execution view |
+| [Executor](../02-components/07-executor.md) | Transaction computation, checkpoints and result certification | Exact-parent jobs, StateChanges, prepared roots, verified commit requests and checkpoint installation |
+| [Storage](../02-components/08-storage.md) | Roots, material checks, persistence and recovery | `read/submit/commit`; `Prepared/Committed/Failed` events |
+| [Result certification and state sync](../02-components/09-result-processing.md) | Executor verifies certificates; Storage persists matching direct or imported material | Verified Storage commit → durable checkpoint → Executor installation and App ACK |
 
 The current source is [Commonware checkout 6233438](https://github.com/0xEyrie/monorepo/tree/6233438985d8249d2b2bc1204191d5d405652288). Current Multimmit Marshal replaces the older proposed application body service and ordinary Baton-owned order-delivery machinery. Historical research pinned to `534af0e` remains useful for its stated questions, but does not describe this new assembly.
 
@@ -62,7 +62,7 @@ The current source is [Commonware checkout 6233438](https://github.com/0xEyrie/m
 
 ## Inputs and outputs between components
 
-`Automaton` connects App's pool and payload validation to Multimmit; Marshal connects block custody and canonical delivery to App. The [callback contracts and pseudocode](../02-components/05-app-callbacks.md) define staging, all `verify` origins, scheduler admission, asynchronous application and ACK handling.
+`Automaton` connects App's pool and payload validation to Multimmit; Marshal connects block custody and canonical delivery to App. The [App callback flows](../02-components/04-app-coordination.md) define staging, all `verify` origins, scheduler admission, asynchronous application and ACK handling.
 
 ## Data, control, and canonical paths
 
@@ -91,4 +91,4 @@ Root preparation remains separate from transaction computation. Reuse QMDB direc
 
 Pre-cut is an independent scheduler configuration with no Baton reports/direction or policy hook. Both modes preserve started local work and sort only eligible pending candidates; both reconcile against the same authoritative Marshal Update stream.
 
-Baton additionally needs actual leader context and authenticated native policy adoption to preserve a chosen prefix in canonical order. Existing Automaton methods are producer-payload callbacks, and current Marshal interprets the native fixed order. An app-only scheduler can guide speculation; full Baton requires specific native/Marshal changes and proofs. Do not reorder already delivered Updates to simulate that missing integration. [Direction and the native gap](../02-components/07-alignment.md#existing-callbacks-versus-the-native-policy-gap) states the outstanding contract.
+Baton additionally needs actual leader context and authenticated native policy adoption to preserve a chosen prefix in canonical order. Existing Automaton methods are producer-payload callbacks, and current Marshal interprets the native fixed order. An app-only scheduler can guide speculation; full Baton requires specific native/Marshal changes and proofs. Do not reorder already delivered Updates to simulate that missing integration. [Direction and the native gap](../02-components/06-alignment.md#existing-callbacks-versus-the-native-policy-gap) states the outstanding contract.

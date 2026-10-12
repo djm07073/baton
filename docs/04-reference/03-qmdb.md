@@ -145,4 +145,4 @@ An applied checkpoint may survive a crash before durability was observed. Existi
 
 Current value/absence proofs can serve guarded app queries, but an operation-inclusion proof does not prove current absence. These proofs do not supply the full execution certificate or establish durability. Query scope and historical retention remain open.
 
-For active imports, use the same writer/fences and verify both certificate and material before stopping direct work. [Certified state sync](../02-components/11-state-sync.md) explains why a progress notification or Marshal floor alone cannot establish application-state readiness.
+For active imports, use the same writer/fences and verify both certificate and material before stopping direct work. [Certified state sync](../02-components/09-result-processing.md#state-sync-from-certified-execution-results) explains why a progress notification or Marshal floor alone cannot establish application-state readiness.

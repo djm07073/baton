@@ -63,7 +63,7 @@ Execution jobs carry the exact input block plus the execution checkpoint selecte
 
 Candidate metadata identifies the exact block; an execution attempt also identifies its chosen path and parent. A duplicate candidate notification does not launch another copy of an active attempt. Repair on a different exact parent remains distinct work.
 
-Preserve completed/current `F` and sort only pending eligible inputs. A state-dependent child starts when the valid predecessor checkpoint is ready. Missing/unfinished parents leave work pending. A new arrival does not cancel or relabel started work; a new canonical Update may require exact-parent repair. [Scheduling rule](07-alignment.md#global-rule-for-local-execution-and-reports).
+Preserve completed/current `F` and sort only pending eligible inputs. A state-dependent child starts when the valid predecessor checkpoint is ready. Missing/unfinished parents leave work pending. A new arrival does not cancel or relabel started work; a new canonical Update may require exact-parent repair. [Scheduling rule](06-alignment.md#global-rule-for-local-execution-and-reports).
 
 ## Cold reads and checkpoint installation
 
@@ -87,15 +87,15 @@ For a durable ABC checkpoint while local work is at A, installation skips B/C an
 
 ## Execution effects and storage roots
 
-Executor produces exact StateChanges on memory overlays. [Storage](09-storage.md) materializes selected effects into concrete QMDB batches, prepares deterministic commitments and controls physical persistence. Retain effects still needed by branches before a root-preparation operation consumes its only draft. Existing sealed-parent forks are usable; root-deferred branching needs its own App integration. See the [QMDB reference](../04-reference/03-qmdb.md).
+Executor produces exact StateChanges on memory overlays. [Storage](08-storage.md) materializes selected effects into concrete QMDB batches, prepares deterministic commitments and controls physical persistence. Retain effects still needed by branches before a root-preparation operation consumes its only draft. Existing sealed-parent forks are usable; root-deferred branching needs its own App integration. See the [QMDB reference](../04-reference/03-qmdb.md).
 
 The full `commonware_glue::stateful::Application` lifecycle is optional reference material. Its [mailbox](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/glue/src/stateful/actor/core/mailbox.rs#L8) targets the block/ancestry `commonware_consensus::Application` and Simplex Marshal contracts. Multimmit uses different callbacks; concrete DB utilities can be reused independently.
 
 ## Result certification and state sync
 
-[Executor result certification](10-result-processing.md) combines accepted direct-execution evidence with Storage-prepared commitments and peer signatures. Executor validates matching `f+1` evidence before requesting Storage commit for direct or imported results. While certification is pending, valid private execution may continue; canonical state and ACK do not advance.
+[Executor result certification](09-result-processing.md) combines accepted direct-execution evidence with Storage-prepared commitments and peer signatures. Executor validates matching `f+1` evidence before requesting Storage commit for direct or imported results. While certification is pending, valid private execution may continue; canonical state and ACK do not advance.
 
-[State sync](11-state-sync.md) supplies the same durable checkpoint handoff. Imported work retains its provenance and cannot produce the node's own direct-execution signature. Later work executed directly from that checkpoint may be signed.
+[State sync](09-result-processing.md#state-sync-from-certified-execution-results) supplies the same durable checkpoint handoff. Imported work retains its provenance and cannot produce the node's own direct-execution signature. Later work executed directly from that checkpoint may be signed.
 
 ## Open decisions
 

@@ -21,7 +21,7 @@ flowchart TB
 
 The policy choice uses sum-LCP only with a nonempty frozen report snapshot. No reports or no completed valid candidate uses the base path before adoption; an adopted protected prefix cannot be discarded as fallback.
 
-Read after [Alignment policy](../02-components/07-alignment.md). This case follows report/direction messages and the explicitly unresolved native policy hooks through timing, completion and failure paths.
+Read after [Alignment policy](../02-components/06-alignment.md). This case follows report/direction messages and the explicitly unresolved native policy hooks through timing, completion and failure paths.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../04-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
 

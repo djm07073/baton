@@ -30,7 +30,7 @@ Selection preserves the chosen bytes. Canonical maintenance follows durable outc
 | App propose handler → TxPool | `pool.select(ctx, limits)` → `RetainedBatch` | Stable selected bytes fit dependency, count, work and full-body limits |
 | App durable-outcome handling → TxPool | `pool.reconcile(applied_outcomes)` | Exact applied outcomes reconciled with the chosen backend |
 
-These concrete calls are defined in the [communication reference](../04-reference/01-communication-contracts.md#private-pool-and-execution-calls). The [App callback](05-app-callbacks.md#automatonpropose-pool-to-staged-block) packs selected bytes into a producer block. Pool selection never substitutes for canonical inclusion.
+These concrete calls are defined in the [communication reference](../04-reference/01-communication-contracts.md#private-pool-and-execution-calls). The [App callback](04-app-coordination.md#automatonpropose-pool-to-staged-block) packs selected bytes into a producer block. Pool selection never substitutes for canonical inclusion.
 
 Admission verifies encoding, signature/domain and chosen stateless rules, then applies payload-based policy. Both RPC and peer paths use the same classification. Selected candidates may enter local batches. Valid unselected candidates remain only for the chosen retention/propagation policy. Invalid input is dropped. These classes need no second pool, actor or physical connection. Static classification uses immutable payload facts; live balances, canonical nonces and node load belong to separate readiness checks.
 
@@ -38,9 +38,9 @@ Selection uses the supplied Multimmit producer context. Its `parent` is a produc
 
 Local pool membership, selection and readiness govern this node's proposals; peer or canonical blocks are validated under the agreed payload rules without requiring their transactions to have been locally admitted or selected.
 
-The [proposal flow diagram](05-app-callbacks.md#automatonpropose-pool-to-staged-block) shows selection → block construction → staging → body-digest reply.
+The [proposal flow diagram](04-app-coordination.md#automatonpropose-pool-to-staged-block) shows selection → block construction → staging → body-digest reply.
 
-This is App-internal proposal code. Follow the canonical [verify handler](05-app-callbacks.md#automatonverify-validity-custody-and-scheduling) and [Update handler](05-app-callbacks.md#marshal-reportupdate-canonical-input-and-ack) for scheduling, reconciliation and ACK. Pool maintenance consumes recoverable durable outcomes; it adds no required pool-processing ACK to canonical delivery or native consensus. Reconcile missed maintenance before relying on the backend's readiness state.
+This is App-internal proposal code. Follow the canonical [verify handler](04-app-coordination.md#automatonverify-validity-custody-and-scheduling) and [Update handler](04-app-coordination.md#marshal-reportupdate-canonical-input-and-ack) for scheduling, reconciliation and ACK. Pool maintenance consumes recoverable durable outcomes; it adds no required pool-processing ACK to canonical delivery or native consensus. Reconcile missed maintenance before relying on the backend's readiness state.
 
 Transaction ID, body digest and native header digest identify different objects. Maintain selected bytes → body → exact header/context → applied output correspondence.
 

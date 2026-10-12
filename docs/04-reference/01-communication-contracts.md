@@ -95,8 +95,8 @@ Alignment layer handles candidate admission, execution completion and resource a
 
 Follow these visual call paths for the lifecycle:
 
-- [Verify and admission](../02-components/05-app-callbacks.md#automatonverify-validity-custody-and-scheduling): valid payload/custody → optional candidate admission → verdict.
-- [Internal dispatch](../02-components/05-app-callbacks.md#dispatch-after-verification): `next` → owner claim → execution → current completion.
+- [Verify and admission](../02-components/04-app-coordination.md#automatonverify-validity-custody-and-scheduling): valid payload/custody → optional candidate admission → verdict.
+- [Internal dispatch](../02-components/04-app-coordination.md#dispatch-after-verification): `next` → owner claim → execution → current completion.
 - [Ordered application](../03-e2e/06-ordered-application.md#ordering-to-ack-at-a-glance): retained Update → ordering commit → execution/submission → Executor certification → durable state/checkpoint → ACK.
 
 On Storage failure, retain the input and withhold ACK until the cause is resolved or the failed instance is recovered.
@@ -211,7 +211,7 @@ Read a method-call arrow as **caller → owner: operation(inputs)** and its retu
 
 Solid versus dashed sequence arrows distinguish calls from returns/notifications, not durability. Only the stated completion contract establishes durability. Overview flowcharts may group methods and omit arguments; their named methods map to the same contracts as the detailed sequence diagrams. Receiver-local names such as `stage_block`, `engine.start` and `barrier.durable` refer to the documented Mailbox, Engine and Barrier methods. Generic arguments and some configuration fields are omitted for readability; use the Rust reference and source for compilable signatures. `Receiver<T>` is returned by the async Automaton callback; `reply.send(value)` later resolves it. Returning the receiver and sending the verdict are different events.
 
-A label describing internal behavior or a data dependency is not an additional Rust method. `[A]` calls are documented concrete App helpers, with implementation signatures left private. A coalesced dispatch wakeup is an internal notification with no required named event type. `[X]` hooks are explicitly unresolved native obligations, not implementable SDK signatures. `wire:` App message names describe logical content; their codecs remain open. The [message catalog](../02-components/12-networking.md#messages-used-in-diagrams) records those distinctions. Do not interpret all arrows as public trait methods.
+A label describing internal behavior or a data dependency is not an additional Rust method. `[A]` calls are documented concrete App helpers, with implementation signatures left private. A coalesced dispatch wakeup is an internal notification with no required named event type. `[X]` hooks are explicitly unresolved native obligations, not implementable SDK signatures. `wire:` App message names describe logical content; their codecs remain open. The [message catalog](../02-components/10-networking.md#messages-used-in-diagrams) records those distinctions. Do not interpret all arrows as public trait methods.
 
 The practical implementation split is:
 
@@ -290,11 +290,11 @@ PreCut uses admission, pending sorting and dispatch directly. Baton uses the sam
 | `app.publish_applied(applied)` | App owner | Advance exact applied identity once, retain/forward `applied.checkpoint` to Executor and schedule pool reconciliation. ACK covered Updates after certified durability; checkpoint handoff adds no approval round. |
 | `state.recover(config)` | Storage assembly → `RecoveredState` or recovery failure | Load linked state/output/applied-position/certificate/provenance as a checkpoint candidate. Executor revalidates its certificate with `results.accept`; `Storage::commit(verified)` idempotently confirms the matching durable record and emits `Committed`. Only then install the checkpoint and dispatch. Configured genesis supplies its trusted initial checkpoint without an execution certificate. |
 
-The owner awaits exact ordered changes and `Storage::submit` acceptance as one canonical-worker operation; Executor supplies verified commit authority through `Storage::commit`. It handles `Prepared` and `Committed` events independently, without awaiting a flush inside execution. The ACK tokens stay with the retained delivery owner throughout these calls. `Storage` does not acknowledge Marshal directly. After a crash between App persistence and Marshal cursor persistence, replay verifies exact identity and recoverable certification evidence, then acknowledges idempotently. No new signature round is needed for a recovered certified applied record. Missing certification keeps input pending. The bounded signing unit must permit progress inside the delivery window; see the [canonical sequence](../03-e2e/06-ordered-application.md) and [certification units](../02-components/10-result-processing.md#certification-units-and-delivery-progress).
+The owner awaits exact ordered changes and `Storage::submit` acceptance as one canonical-worker operation; Executor supplies verified commit authority through `Storage::commit`. It handles `Prepared` and `Committed` events independently, without awaiting a flush inside execution. The ACK tokens stay with the retained delivery owner throughout these calls. `Storage` does not acknowledge Marshal directly. After a crash between App persistence and Marshal cursor persistence, replay verifies exact identity and recoverable certification evidence, then acknowledges idempotently. No new signature round is needed for a recovered certified applied record. Missing certification keeps input pending. The bounded signing unit must permit progress inside the delivery window; see the [canonical sequence](../03-e2e/06-ordered-application.md) and [certification units](../02-components/09-result-processing.md#certification-units-and-delivery-progress).
 
 ## Baton behavior and native extension
 
-Baton implements the same Alignment contracts as PreCut. Its report authentication, fixed-window collection, bounded direction selection and pending-order changes remain implementation behavior. The [policy rules](../02-components/07-alignment.md) define the invariants; no private method catalog is part of the SDK contract. The following native extension obligations are separate from that internal decomposition.
+Baton implements the same Alignment contracts as PreCut. Its report authentication, fixed-window collection, bounded direction selection and pending-order changes remain implementation behavior. The [policy rules](../02-components/06-alignment.md) define the invariants; no private method catalog is part of the SDK contract. The following native extension obligations are separate from that internal decomposition.
 
 | **[X]** obligation named in diagrams | Native implementation still required |
 |---|---|
@@ -340,11 +340,11 @@ Existing cloneable handles and Commonware channels connect the App owner to asyn
 | Question | Canonical page |
 |---|---|
 | What goes inside App, and what does Marshal already implement? | [Application connection guide](../02-components/04-app-coordination.md) |
-| What does verify do; how are local, remote, recovery and repeated calls handled? | [Callback behavior and pseudocode](../02-components/05-app-callbacks.md#automatonverify-validity-custody-and-scheduling) |
-| What exactly waits for ACK and how does crash redelivery work? | [Update, queue and durability contract](../02-components/05-app-callbacks.md#marshal-reportupdate-canonical-input-and-ack) |
+| What does verify do; how are local, remote, recovery and repeated calls handled? | [App verification flow](../02-components/04-app-coordination.md#automatonverify-validity-custody-and-scheduling) |
+| What exactly waits for ACK and how does crash redelivery work? | [Update, queue and durability contract](../02-components/04-app-coordination.md#marshal-reportupdate-canonical-input-and-ack) |
 | Which digest, parent, index or context does a value identify? | [Terminology](../01-overview/02-terminology.md), [Rust types and callbacks](02-rust-signatures.md) |
-| How do Pre-cut and Baton differ, and what native work remains? | [Alignment and policy gap](../02-components/07-alignment.md) |
-| How are execution effects, roots, writer access and imported results connected? | [Executor](../02-components/08-executor.md), [Storage](../02-components/09-storage.md), [result processing](../02-components/10-result-processing.md), [QMDB](03-qmdb.md) and [state sync](../02-components/11-state-sync.md) |
+| How do Pre-cut and Baton differ, and what native work remains? | [Alignment and policy gap](../02-components/06-alignment.md) |
+| How are execution effects, roots, writer access and imported results connected? | [Executor](../02-components/07-executor.md), [Storage](../02-components/08-storage.md), [result certification and state sync](../02-components/09-result-processing.md), and [QMDB](03-qmdb.md) |
 
 Use types from one resolved Commonware dependency graph; matching names or digest bytes across versions do not establish Rust type compatibility. Native Activity and Marshal Update need separate typed reporter handles when both enter one App, because Reporter has one associated Activity per implementation.
 

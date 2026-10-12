@@ -28,7 +28,7 @@ The source before page partitioning is preserved in the [archived snapshot](arch
 
 <a id="16-p2p-연결과-message-planes"></a>
 
-[P2P and message paths](docs/02-components/12-networking.md#p2p-connections-and-message-planes)
+[P2P and message paths](docs/02-components/10-networking.md#p2p-connections-and-message-planes)
 
 <a id="17-rust-trait를-읽는-방법"></a>
 
@@ -48,7 +48,7 @@ The source before page partitioning is preserved in the [archived snapshot](arch
 
 <a id="32-인터페이스-개요"></a>
 
-[Tx interfaces](docs/02-components/06-tx-pool.md#interface-overview)
+[Tx interfaces](docs/02-components/05-tx-pool.md#interface-overview)
 
 <a id="41-역할과-책임"></a>
 
@@ -88,43 +88,43 @@ The source before page partitioning is preserved in the [archived snapshot](arch
 
 <a id="54-leader-report로-baton-생성"></a>
 
-[Direction and rescheduling](docs/02-components/07-alignment.md#leader-choose-direction-from-reports)
+[Direction and rescheduling](docs/02-components/06-alignment.md#leader-choose-direction-from-reports)
 
 <a id="55-leader-producer들에게-baton-전파"></a>
 
-[Direction and rescheduling](docs/02-components/07-alignment.md#leader-disseminate-direction)
+[Direction and rescheduling](docs/02-components/06-alignment.md#leader-disseminate-direction)
 
 <a id="56-non-leader-실행재실행-요청"></a>
 
-[Direction and rescheduling](docs/02-components/07-alignment.md#non-leader-request-parent-linked-execution)
+[Direction and rescheduling](docs/02-components/06-alignment.md#non-leader-request-parent-linked-execution)
 
 <a id="58-미결정-사항"></a>
 
-[Direction and rescheduling](docs/02-components/07-alignment.md#open-decisions)
+[Direction and rescheduling](docs/02-components/06-alignment.md#open-decisions)
 
 <a id="52-인터페이스-개요"></a>
 
-[Baton interfaces](docs/02-components/05-app-callbacks.md#interface-overview)
+[Baton interfaces](docs/02-components/04-app-coordination.md#interface-overview)
 
 <a id="57-cut-commit-요청-전달"></a>
 
-[Baton interfaces](docs/02-components/05-app-callbacks.md#finalized-state-progress-notifications)
+[Baton interfaces](docs/02-components/04-app-coordination.md#finalized-state-progress-notifications)
 
 <a id="61-역할과-책임"></a>
 
-[Execution: responsibilities](docs/02-components/08-executor.md#roles-and-responsibilities)
+[Execution: responsibilities](docs/02-components/07-executor.md#roles-and-responsibilities)
 
 <a id="66-미결정-사항"></a>
 
-[Execution: responsibilities](docs/02-components/08-executor.md#open-decisions)
+[Execution: responsibilities](docs/02-components/07-executor.md#open-decisions)
 
 <a id="62-인터페이스-개요"></a>
 
-[Executor, Runtime, and certification interfaces](docs/02-components/10-result-processing.md#interface-overview)
+[Executor, Runtime, and certification interfaces](docs/02-components/09-result-processing.md#interface-overview)
 
 <a id="68-결과-인증-trait"></a>
 
-[Executor, Runtime, and certification interfaces](docs/02-components/10-result-processing.md#result-certification-trait)
+[Executor, Runtime, and certification interfaces](docs/02-components/09-result-processing.md#result-certification-trait)
 
 <a id="63-qmdb-state-관리와-재사용-경계"></a>
 
@@ -140,7 +140,7 @@ The source before page partitioning is preserved in the [archived snapshot](arch
 
 <a id="67-state-sync-인증된-실행-결과로-상태-동기"></a>
 
-[State sync from certified results](docs/02-components/11-state-sync.md#state-sync-from-certified-execution-results)
+[State sync from certified results](docs/02-components/09-result-processing.md#state-sync-from-certified-execution-results)
 
 <a id="21-전체-e2e-tx-입력부터-canonical-state까지"></a>
 
@@ -236,7 +236,7 @@ The source before page partitioning is preserved in the [archived snapshot](arch
 
 <a id="6-실행-레이어와-qmdb"></a>
 
-[Execution: responsibilities](docs/02-components/08-executor.md)
+[Execution: responsibilities](docs/02-components/07-executor.md)
 
 <a id="7-실제-example에-연결할-지점과-개발-순서"></a>
 

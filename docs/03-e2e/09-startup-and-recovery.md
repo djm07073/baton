@@ -22,7 +22,7 @@ flowchart TB
 
 Invalid recovered evidence stops startup. Fresh configured genesis supplies its trusted checkpoint directly; it does not need an execution certificate.
 
-Read after [App coordination](../02-components/04-app-coordination.md), [Marshal delivery](../02-components/03-marshal-delivery.md) and [Storage](../02-components/09-storage.md). This case follows startup calls, recovered checkpoint handoff and idempotent Update replay through timing, completion and failure paths.
+Read after [App coordination](../02-components/04-app-coordination.md), [Marshal delivery](../02-components/03-marshal-delivery.md) and [Storage](../02-components/08-storage.md). This case follows startup calls, recovered checkpoint handoff and idempotent Update replay through timing, completion and failure paths.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../04-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
 

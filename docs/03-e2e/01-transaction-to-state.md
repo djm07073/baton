@@ -101,9 +101,9 @@ sequenceDiagram
 
 </details>
 
-Speculative execution may finish before or after `Update` arrives. `verify(true)` establishes payload validity and custody; it does not wait for that execution. For local blocks, candidate admission must respect the fact that this verify occurs before native header signing. The [callback contract](../02-components/05-app-callbacks.md) covers peer, local and recovery requests.
+Speculative execution may finish before or after `Update` arrives. `verify(true)` establishes payload validity and custody; it does not wait for that execution. For local blocks, candidate admission must respect the fact that this verify occurs before native header signing. The [callback contract](../02-components/04-app-coordination.md) covers peer, local and recovery requests.
 
-For direct canonical work, the App worker awaits the selected unit's execution/reuse and then `Storage::submit` acceptance before advancing to the next ordered unit. The `Ok(())` reply in the diagram ends that synchronous handoff; later preparation, certification and disk flush remain independent. See [execution-to-Storage completion](../02-components/08-executor.md#execution-to-storage-completion).
+For direct canonical work, the App worker awaits the selected unit's execution/reuse and then `Storage::submit` acceptance before advancing to the next ordered unit. The `Ok(())` reply in the diagram ends that synchronous handoff; later preparation, certification and disk flush remain independent. See [execution-to-Storage completion](../02-components/07-executor.md#execution-to-storage-completion).
 
 Marshal already delivers the ordinary native total order. The App reconciles retained work against these Updates and its canonical worker applies their exact sequence. It does not sort Updates again or require an earlier speculative candidate. In Baton mode, reports and direction operate alongside this path; native proposal-policy integration remains [open](../04-reference/05-native-open-decisions.md).
 
@@ -146,4 +146,4 @@ sequenceDiagram
 
 `admit` and `select` name App-internal pool operations, not a new public consensus trait. Selected/unselected are logical classes; their physical representation and policy remain open. RPC and peer input use the same validation and admission policy. Duplicate suppression in one pool does not establish global exactly-once execution when multiple producers include the same transaction.
 
-See [transaction admission and selection](../02-components/06-tx-pool.md) for the App pool contract, the [backend survey](../04-reference/04-pool-backends.md) for reuse options, and [canonical application](06-ordered-application.md) for durable outcome handling. The node assembly is grounded in the current [log-multimmit example](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/examples/log-multimmit/src/node.rs#L242); its synthetic payload generator does not implement this transaction application.
+See [transaction admission and selection](../02-components/05-tx-pool.md) for the App pool contract, the [backend survey](../04-reference/04-pool-backends.md) for reuse options, and [canonical application](06-ordered-application.md) for durable outcome handling. The node assembly is grounded in the current [log-multimmit example](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/examples/log-multimmit/src/node.rs#L242); its synthetic payload generator does not implement this transaction application.

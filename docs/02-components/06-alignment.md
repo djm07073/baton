@@ -31,7 +31,7 @@ Alignment owns eligible candidates and pending scheduling policy. It preserves s
 | App dispatch → policy | Internal `AlignmentPolicy::next(view)` → `Option<JobIntent>` | A proposed block/parent pair or no eligible work; resources remain unclaimed |
 | Peer Apps ↔ Baton policy | Window announcement, signed reports and signed direction | Authenticated scheduling information; no ordering finality or execution certificate |
 
-The [shared Alignment contract](../04-reference/01-communication-contracts.md#proposed-alignment-interface) defines method results, view contents and invariants. The [message catalog](12-networking.md#messages-used-in-diagrams) describes peer content. PreCutAlignment and BatonAlignment share the traits; Baton-specific report/planning functions remain private.
+The [shared Alignment contract](../04-reference/01-communication-contracts.md#proposed-alignment-interface) defines method results, view contents and invariants. The [message catalog](10-networking.md#messages-used-in-diagrams) describes peer content. PreCutAlignment and BatonAlignment share the traits; Baton-specific report/planning functions remain private.
 
 ## Shared application state and different scheduling policy
 
@@ -67,7 +67,7 @@ The local started prefix is not canonical. A later continuous Marshal Update can
 
 ## Canonical reconciliation is shared
 
-Both schedulers use the same [canonical Update worker](05-app-callbacks.md#marshal-reportupdate-canonical-input-and-ack). Compare retained work with the exact canonical predecessor, ordered prefix, input state and runtime. A matching block digest alone is insufficient, and a producer-header parent is not the merged execution parent. Missing required bodies or state keep work pending; they do not create empty inputs.
+Both schedulers use the same [canonical Update worker](04-app-coordination.md#marshal-reportupdate-canonical-input-and-ack). Compare retained work with the exact canonical predecessor, ordered prefix, input state and runtime. A matching block digest alone is insufficient, and a producer-header parent is not the merged execution parent. Missing required bodies or state keep work pending; they do not create empty inputs.
 
 Alignment records the exact finalized order through `commit(ordered)` immediately. App Executor independently reuses or repairs that path in memory. Executor verifies its matching `f+1` certificate and requests Storage commit; Storage applies it durably and supplies a usable checkpoint back to Executor. Installation advances the execution base, skips covered inputs and retires conflicting work; ACK remains tied to certified durability. Retain compatible descendants only within the resource and retention budget. Reports and direction add no approval step.
 

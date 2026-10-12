@@ -21,7 +21,7 @@ flowchart TB
 
 [Open full-size diagram](../assets/diagrams/diagram-52.svg) · [PNG](../assets/diagrams/diagram-52.png)
 
-Both Pre-cut and Baton fit inside App. The shared canonical worker consumes Marshal's ordered-delivery contract in either mode. Baton report/direction logic has no authority to reorder the Update stream. The remaining native protected-prefix integration is described [separately](../02-components/07-alignment.md#existing-callbacks-versus-the-native-policy-gap).
+Both Pre-cut and Baton fit inside App. The shared canonical worker consumes Marshal's ordered-delivery contract in either mode. Baton report/direction logic has no authority to reorder the Update stream. The remaining native protected-prefix integration is described [separately](../02-components/06-alignment.md#existing-callbacks-versus-the-native-policy-gap).
 
 <a id="blockservice"></a>
 
@@ -43,7 +43,7 @@ fn verify(
 ) -> impl Future<Output = oneshot::Receiver<bool>> + Send;
 ```
 
-`propose` selects App transactions, builds the exact producer-context block and returns its body digest after staged admission. It commits the proposer to successful verification of the same pair. `verify` confirms payload validity and Multimmit's durable custody obligations; it records usable scheduler input without awaiting speculative execution. Keep temporary missing data pending and reserve `false` for permanent invalidity. The shared trait documents terminal closure, but current remote Multimmit reschedules closed-receiver `Unavailable` results; local/recovery paths instead require success. Deduplicate live repeats and recovery. [Path-specific behavior](../02-components/05-app-callbacks.md#automatonverify-validity-custody-and-scheduling).
+`propose` selects App transactions, builds the exact producer-context block and returns its body digest after staged admission. It commits the proposer to successful verification of the same pair. `verify` confirms payload validity and Multimmit's durable custody obligations; it records usable scheduler input without awaiting speculative execution. Keep temporary missing data pending and reserve `false` for permanent invalidity. The shared trait documents terminal closure, but current remote Multimmit reschedules closed-receiver `Unavailable` results; local/recovery paths instead require success. Deduplicate live repeats and recovery. [Path-specific behavior](../02-components/04-app-coordination.md#automatonverify-validity-custody-and-scheduling).
 
 The body implements existing `Codec` and `Digestible` with the same hasher digest; Multimmit's blanket `Body<H>` implementation supplies the marker. Use existing `TransactionBlock<H,B>` and header types rather than another generic block trait. The producer header `parent` identifies lane ancestry, not application execution state.
 
@@ -95,7 +95,7 @@ pub struct Update<B: Block> {
 }
 ```
 
-App retains the token while reconciling/applying that exact input, then consumes it through `Acknowledgement::acknowledge`. ACK follows application durability; Marshal's cursor sync is a subsequent boundary. Redelivery must be idempotent. The current delivery actor does not retry a dropped Update on `Feedback::Backoff`; account for its ordinary delivery window and floor-reset overlap while preserving accepted tokens. Update has no generation field; App coordinates the state-import/floor lifecycle itself. [Detailed failure and queue contract](../02-components/05-app-callbacks.md#marshal-reportupdate-canonical-input-and-ack).
+App retains the token while reconciling/applying that exact input, then consumes it through `Acknowledgement::acknowledge`. ACK follows application durability; Marshal's cursor sync is a subsequent boundary. Redelivery must be idempotent. The current delivery actor does not retry a dropped Update on `Feedback::Backoff`; account for its ordinary delivery window and floor-reset overlap while preserving accepted tokens. Update has no generation field; App coordinates the state-import/floor lifecycle itself. [Detailed failure and queue contract](../02-components/04-app-coordination.md#marshal-reportupdate-canonical-input-and-ack).
 
 Open the public `multimmit::marshal::open`, connect its resolver bridge, obtain its reusable relay, then start the service with `SchemeVerifier` and the application Update reporter. The public service start returns the mailbox and service handle. [Assembly](07-development-order.md) follows the current example rather than copying historical Simplex wiring.
 
@@ -113,7 +113,7 @@ For Multimmit `Plan = ()`; `digest` is the full header/block identity. Marshal's
 
 ## Pool stays inside App
 
-Use concrete admission/selection functions. Admission applies bounded structural/static selected-or-unselected policy; selection packs retained selected candidates for `propose`. Selection and proposal do not establish canonical retirement. Canonical outcomes update the chosen pool backend internally. Backend, policy and P2P retention remain open. [Pool behavior](../02-components/06-tx-pool.md).
+Use concrete admission/selection functions. Admission applies bounded structural/static selected-or-unselected policy; selection packs retained selected candidates for `propose`. Selection and proposal do not establish canonical retirement. Canonical outcomes update the chosen pool backend internally. Backend, policy and P2P retention remain open. [Pool behavior](../02-components/05-tx-pool.md).
 
 <a id="orderer"></a>
 <a id="planner"></a>
@@ -121,7 +121,7 @@ Use concrete admission/selection functions. Admission applies bounded structural
 
 ## Alignment stays inside App
 
-Select a concrete Pre-cut or Baton implementation at startup. Both operate on shared candidate/checkpoint state and preserve `F ++ sort_G(S_pending)`. Baton additionally handles reports, frozen-window evaluation and direction. Private handlers and existing runtime workers suffice; no public `on_block/on_finality/execute/commit` framework is introduced. Marshal already supplies ordinary ordered delivery. [Scheduling behavior](../02-components/07-alignment.md).
+Select a concrete Pre-cut or Baton implementation at startup. Both operate on shared candidate/checkpoint state and preserve `F ++ sort_G(S_pending)`. Baton additionally handles reports, frozen-window evaluation and direction. Private handlers and existing runtime workers suffice; no public `on_block/on_finality/execute/commit` framework is introduced. Marshal already supplies ordinary ordered delivery. [Scheduling behavior](../02-components/06-alignment.md).
 
 <a id="runtime"></a>
 <a id="resultservice"></a>
@@ -136,4 +136,4 @@ Transaction workers produce effects/checkpoints on exact parents. Storage prepar
 
 App's execution components exchange signatures, certificates and change sets directly over Commonware P2P. Retain full input/range, canonical base, runtime and result binding; collect `f+1` distinct eligible epoch signatures for the research result endpoint. A received certificate is not durable state, and imported material cannot become an own direct-execution signature.
 
-`Alignment::commit(ordered)` records finalized ordering without waiting for execution or signatures. Executor requests Storage commit only after verifying a matching `f+1` certificate for both direct and imported results. Missing certification keeps prepared work pending. Imported apply also verifies material and applicability before stopping local work. The scheduler supplies no state-commit approval. Concrete VM, result wire format, safe switching and rootless branch representation remain implementation work. [Execution](../02-components/10-result-processing.md), [state backend](03-qmdb.md) and [state sync](../02-components/11-state-sync.md) detail the implementation behind the proposed [Storage contract](01-communication-contracts.md#proposed-storage-interface).
+`Alignment::commit(ordered)` records finalized ordering without waiting for execution or signatures. Executor requests Storage commit only after verifying a matching `f+1` certificate for both direct and imported results. Missing certification keeps prepared work pending. Imported apply also verifies material and applicability before stopping local work. The scheduler supplies no state-commit approval. Concrete VM, result wire format, safe switching and rootless branch representation remain implementation work. [Execution](../02-components/09-result-processing.md), [state backend](03-qmdb.md) and [state sync](../02-components/09-result-processing.md#state-sync-from-certified-execution-results) detail the implementation behind the proposed [Storage contract](01-communication-contracts.md#proposed-storage-interface).

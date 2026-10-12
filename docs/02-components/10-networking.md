@@ -81,13 +81,13 @@ Bound complete encoded messages and outstanding requests/subscriptions, not only
 
 | Diagram label | Contract / definition |
 |---|---|
-| `Transaction(tx)` | Bounded transaction input admitted under the [pool contract](06-tx-pool.md); transport receipt is not admission or inclusion. |
-| `WindowAnnouncement(context, deadline)` | Baton report-window context and fixed closure deadline under the [report rules](07-alignment.md); authentication and exact context checks are required. |
+| `Transaction(tx)` | Bounded transaction input admitted under the [pool contract](05-tx-pool.md); transport receipt is not admission or inclusion. |
+| `WindowAnnouncement(context, deadline)` | Baton report-window context and fixed closure deadline under the [report rules](06-alignment.md); authentication and exact context checks are required. |
 | `SignedReport(context, intended_order)` | Original authenticated intended-order report, counted once per eligible identity in the fixed window; not execution evidence. |
 | `SignedDirection(context, order)` | Authenticated advisory direction under the same context; [pending-order rules](../03-e2e/05-direction-and-execution.md) constrain adoption. It does not establish native finality. |
-| `ExecutionAttestation(statement, signature)` | Original eligible validator signature over the exact direct-execution subject under [result certification](10-result-processing.md#result-certification-inside-executor). |
+| `ExecutionAttestation(statement, signature)` | Original eligible validator signature over the exact direct-execution subject under [result certification](09-result-processing.md#result-certification-inside-executor). |
 | `ExecutionCertificate(statement, signatures)` | Matching full subject and distinct eligible `f+1` evidence; Executor verifies it before requesting Storage commit. |
-| `MaterialRequest(verified_target)` / `StateMaterial(target, data, outputs)` | Request and applicable state/output material bound to the same certified target under [state sync](11-state-sync.md); a certificate alone is not material. |
+| `MaterialRequest(verified_target)` / `StateMaterial(target, data, outputs)` | Request and applicable state/output material bound to the same certified target under [state sync](09-result-processing.md#state-sync-from-certified-execution-results); a certificate alone is not material. |
 | `TransactionBlock` / `SignedTransactionBlock` | Existing complete block / signed producer-header artifacts; [body exchange](02-marshal-custody.md) explains their independent paths. |
 | DA vote/certificate, `LeaderBlock`, native votes and proof artifacts | Existing [native protocol messages](01-multimmit.md), not App execution-result certificates. Future policy encoding in diagram 12 remains an unresolved native extension. |
 

@@ -22,7 +22,7 @@ flowchart TB
 
 This example assumes `G = A → B → C`; the actual comparator remains open. Arrival alone does not undo started work. Canonical ordering can still require repair; an advisory direction’s precedence over a conflicting started path remains open.
 
-Read after [Alignment](../02-components/07-alignment.md) and [Executor](../02-components/08-executor.md). This case follows internal `AlignmentPolicy::next`, the App claim step and `execution.execute` through timing, completion and failure paths.
+Read after [Alignment](../02-components/06-alignment.md) and [Executor](../02-components/07-executor.md). This case follows internal `AlignmentPolicy::next`, the App claim step and `execution.execute` through timing, completion and failure paths.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../04-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
 
@@ -32,7 +32,7 @@ For a shared global rule A → B → C, preserve A while it executes. When eligi
 
 If C already started on A, late eligible B does not move it: the local path remains AC, followed by B if ancestry permits. Do not wait for unknown B or reexecute C merely to restore a fresh global sort. The common rule is `F ++ sort_G(S_pending)`, with the started/completed valid prefix `F` held fixed. Reports use the same intention, and already signed reports remain immutable.
 
-A later continuous finalized Update may require another order. The App then finds the matching canonical prefix and repairs only the required suffix. Local started order does not establish finality. [Scheduling contract](../02-components/07-alignment.md)
+A later continuous finalized Update may require another order. The App then finds the matching canonical prefix and repairs only the required suffix. Local started order does not establish finality. [Scheduling contract](../02-components/06-alignment.md)
 
 <a id="non-leader-lifecycle-direction-and-rescheduling"></a>
 
@@ -83,6 +83,6 @@ The diagram starts at direction reception; blocks must independently pass the [b
 
 The precedence of a conflicting advisory direction over an already started local path remains undecided. A valid signature alone does not authorize rolling back canonical state or changing a frozen native proposal policy. Preserve that open decision rather than implementing a hidden rescheduling default in the diagram.
 
-Execution reuse requires identical canonical base, ordered input prefix and runtime, with a completed valid checkpoint. A producer header parent is only the previous block in its own lane; it is not this cross-lane execution parent. [Exact execution and storage responsibilities](../02-components/08-executor.md)
+Execution reuse requires identical canonical base, ordered input prefix and runtime, with a completed valid checkpoint. A producer header parent is only the previous block in its own lane; it is not this cross-lane execution parent. [Exact execution and storage responsibilities](../02-components/07-executor.md)
 
 The App owner accepts a completion only once for the still-current execution attempt and its exact context/valid ancestry. Duplicate or retired/canceled attempts cannot advance the path. Dropping a waiter does not prove CPU or storage work stopped; fence affected live database access before canonical mutation and retain references until safe to release.

@@ -23,7 +23,7 @@ This map organizes the source-pinned survey, not a selected implementation. Comp
 
 Admission classifies valid retained transactions as selected or unselected; invalid input is dropped. Selected transactions may enter local batches. Unselected transactions remain available only for the chosen P2P retention/propagation policy. These are logical classes inside one pool.
 
-The connection is `RPC/peer input → app pool → Automaton::propose → TransactionBlock → Marshal::stage_block`. The app returns the body's digest to Multimmit. Local `verify` establishes valid durable custody before the native producer signs the header; proposal construction does not wait for speculative transaction execution. Later `Reporter<Update>` supplies canonical order to the app. After the matching effects are durably applied, internal pool maintenance retires or refreshes candidates under the selected backend's rules. See [the app callback flow](../02-components/05-app-callbacks.md).
+The connection is `RPC/peer input → app pool → Automaton::propose → TransactionBlock → Marshal::stage_block`. The app returns the body's digest to Multimmit. Local `verify` establishes valid durable custody before the native producer signs the header; proposal construction does not wait for speculative transaction execution. Later `Reporter<Update>` supplies canonical order to the app. After the matching effects are durably applied, internal pool maintenance retires or refreshes candidates under the selected backend's rules. See [the app callback flow](../02-components/04-app-coordination.md).
 
 ## Roles and responsibilities
 
@@ -93,7 +93,7 @@ Built-in peer ingress admits inside the actor, so it does not automatically call
 
 ## Tx P2P connection
 
-Use existing Commonware authenticated P2P connections, with a logical tx channel separate from native consensus messages. Do not assume dedicated physical connections for transactions. Transaction floods compete with report, body, and native processing; concrete quotas, queues, and runtime placement remain open, as described in [P2P message planes](../02-components/12-networking.md#p2p-connections-and-message-planes).
+Use existing Commonware authenticated P2P connections, with a logical tx channel separate from native consensus messages. Do not assume dedicated physical connections for transactions. Transaction floods compete with report, body, and native processing; concrete quotas, queues, and runtime placement remain open, as described in [P2P message planes](../02-components/10-networking.md#p2p-connections-and-message-planes).
 
 Use the selected chain backend's transaction transport when its complete workload/network is adopted. Constantinople's inspected ingress is HTTP with a separate HTTP relayer; it does not supply generic Commonware peer tx gossip. A generic Baton transport can reuse Commonware buffered broadcast and resolver on the existing authenticated channels. Their digest cache/fetch services replace generic propagation/cache/retry machinery, but do not choose unknown-tx inventory, admission identity or canonical cleanup. [Constantinople ingress](https://github.com/commonwarexyz/constantinople/blob/3b6c92e76bf582855615844a4175b8304808f6a9/crates/mempool/src/webserver/actor.rs#L718), [HTTP relayer](https://github.com/commonwarexyz/constantinople/blob/3b6c92e76bf582855615844a4175b8304808f6a9/bin/validator/src/relayer.rs#L455).
 

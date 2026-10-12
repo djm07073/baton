@@ -21,11 +21,11 @@ Start with the picture on each page. E2E pages show a short path first; expand t
 The folders and filenames are numbered in reading order. Follow `01-overview`, then `02-components`, then `03-e2e`. Keep `04-reference` nearby for details when needed.
 
 1. **`01-overview/` — understand the whole composition.** Read [Architecture](01-overview/01-architecture.md), then [terminology](01-overview/02-terminology.md) for the values passed between components.
-2. **`02-components/` — understand each responsibility and exchange.** Start with [Multimmit](02-components/01-multimmit.md) and follow files `01`–`12`: communication partners, inputs, outputs and completion conditions.
+2. **`02-components/` — understand each responsibility and exchange.** Start with [Multimmit](02-components/01-multimmit.md) and follow the [component contents](SUMMARY.md): communication partners, inputs, outputs and completion conditions.
 3. **`03-e2e/` — follow the complete flow.** Start with [Transaction to durable state](03-e2e/01-transaction-to-state.md). Files `02`–`09` expand individual paths and recovery.
 4. **`04-reference/` — look up details as needed.** Consult [communication contracts](04-reference/01-communication-contracts.md), Rust signatures, backend research and development checks from the component and E2E links.
 
-Within the component section, the order is **Multimmit → Marshal → App coordination and callbacks → TxPool → Alignment → Executor → Storage → Executor result certification → state sync → P2P**. Once these responsibilities and exchanges are clear, continue to the first E2E page. Detailed type declarations can wait until you need them.
+Within the component section, the order is **Multimmit → Marshal → App integration → TxPool → Alignment → Executor → Storage → Result certification and state sync → P2P**. Once these responsibilities and exchanges are clear, continue to the first E2E page. Detailed type declarations can wait until you need them.
 
 The [full contents](SUMMARY.md), filenames and site's previous/next links use this same order. `assets/` contains diagram renders and the generated Rust export; it is not a reading chapter.
 

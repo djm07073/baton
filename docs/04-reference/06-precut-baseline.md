@@ -57,7 +57,7 @@ flowchart TB
 | Optional native `Reporter<Activity>` | Consume useful authenticated header/context observations; do not use lossy hints as the canonical stream |
 | Marshal `Reporter<Update>` | Retain canonical index/block/ACK, reconcile/apply work asynchronously, ACK matching durable application |
 
-Live verify-based intake applies to validators, including nonproducing validators. `Role::Observer` has no live per-chain validation planes; it executes canonical Updates unless an explicit authenticated early-candidate intake is added. `verify` also runs for local pre-sign custody and startup recovery. A callback is not automatically another-lane packet arrival. Qualify lifecycle, lane, exact authenticated context/reference, duplicate state and applied position before admitting a candidate. Header and body arrival order can differ. Preserve native authentication and body validation; no DA-certificate barrier is added merely for speculation. [Callback contract](../02-components/05-app-callbacks.md).
+Live verify-based intake applies to validators, including nonproducing validators. `Role::Observer` has no live per-chain validation planes; it executes canonical Updates unless an explicit authenticated early-candidate intake is added. `verify` also runs for local pre-sign custody and startup recovery. A callback is not automatically another-lane packet arrival. Qualify lifecycle, lane, exact authenticated context/reference, duplicate state and applied position before admitting a candidate. Header and body arrival order can differ. Preserve native authentication and body validation; no DA-certificate barrier is added merely for speculation. [Callback contract](../02-components/04-app-coordination.md).
 
 ```mermaid
 flowchart TB
@@ -104,7 +104,7 @@ Repair in response to an unfinalized cut proposal is still an open additional po
 
 ## Result certification and state sync
 
-Use the same [result verification](../02-components/10-result-processing.md#result-certification-inside-executor) and [certified state-sync path](../02-components/11-state-sync.md) as Baton. State finalization requires irrevocable exact input/base plus `f+1` distinct eligible signatures on the same runtime/result statement. It precedes canonical application and durable/read readiness. Apply this gate in Original, PreCut and Baton comparisons alike.
+Use the same [result verification](../02-components/09-result-processing.md#result-certification-inside-executor) and [certified state-sync path](../02-components/09-result-processing.md#state-sync-from-certified-execution-results) as Baton. State finalization requires irrevocable exact input/base plus `f+1` distinct eligible signatures on the same runtime/result statement. It precedes canonical application and durable/read readiness. Apply this gate in Original, PreCut and Baton comparisons alike.
 
 App peers exchange results/material directly. A valid applicable certificate and material can replace unfinished local repair through the shared writer/fencing contract. Imported work cannot be signed as own direct execution. Keep this capability/configuration identical across comparisons and measure direct repair versus imported completion separately.
 
@@ -130,4 +130,4 @@ Measure latency distributions and throughput for ingress→ordering, ordering→
 - [ ] Verify native extension/view recovery and Marshal body/history gap handling without a second ordered-delivery implementation.
 - [ ] Run matched Original/PreCut/Baton endpoint and cost measurements. Runtime checks and benchmarks are **Not run**.
 
-The [shared execution decisions](../02-components/08-executor.md#open-decisions) remain open. Designing those choices and Baton's native protected-prefix integration are separate from reusing the already existing ordinary Marshal stream.
+The [shared execution decisions](../02-components/07-executor.md#open-decisions) remain open. Designing those choices and Baton's native protected-prefix integration are separate from reusing the already existing ordinary Marshal stream.

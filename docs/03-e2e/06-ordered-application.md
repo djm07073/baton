@@ -22,7 +22,7 @@ This is the direct path. Verified import and recovered durable replay use the sa
 
 <a id="cut-commit--ordered-range--execution-commit"></a>
 
-Read after [Marshal delivery](../02-components/03-marshal-delivery.md), [Executor](../02-components/08-executor.md) and [Storage](../02-components/09-storage.md). This case follows ordering-only `Alignment::commit`, StateChanges, Storage events and the retained ACK through timing, completion and failure paths.
+Read after [Marshal delivery](../02-components/03-marshal-delivery.md), [Executor](../02-components/07-executor.md) and [Storage](../02-components/08-storage.md). This case follows ordering-only `Alignment::commit`, StateChanges, Storage events and the retained ACK through timing, completion and failure paths.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../04-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
 
@@ -102,7 +102,7 @@ The example node supplies assembly wiring, not this durable transaction consumer
 
 Within one active delivery window, Marshal can report multiple Updates while earlier ACKs are pending, up to `max_pending_acks`. Once the window is full, further application delivery waits; native Multimmit continues independently. Completed ACKs free the contiguous window prefix, and Marshal separately syncs its durable cursor. The window slot does not wait for that cursor's own I/O. [Delivery actor](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/actors/delivery/actor.rs#L303), [ACK window](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/actors/delivery/acks.rs#L107)
 
-`report` is a synchronous retained handoff: preserve every accepted Update and its Exact token in App state, using coalesced wakeups if needed. `Backoff` does not request redelivery, and an unacknowledged dropped Exact clone cancels completion. The [canonical callback contract](../02-components/05-app-callbacks.md#marshal-reportupdate-canonical-input-and-ack) defines active-window sizing, clone obligations, crash replay and App-owned floor/import coordination; floor resets do not clear App's retained Updates.
+`report` is a synchronous retained handoff: preserve every accepted Update and its Exact token in App state, using coalesced wakeups if needed. `Backoff` does not request redelivery, and an unacknowledged dropped Exact clone cancels completion. The [canonical callback contract](../02-components/04-app-coordination.md#marshal-reportupdate-canonical-input-and-ack) defines active-window sizing, clone obligations, crash replay and App-owned floor/import coordination; floor resets do not clear App's retained Updates.
 
 ## Execution lifecycle: QMDB branches and canonical promotion
 

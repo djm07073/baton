@@ -21,7 +21,7 @@ flowchart TB
 
 A received full certificate enters the same verifier without requiring a local signing round. Import additionally needs matching verified material; it never grants direct-signing provenance.
 
-Read after [result processing](../02-components/10-result-processing.md) and [Storage](../02-components/09-storage.md). This case follows `Prepared`, direct signing, peer evidence and `Storage::commit` through timing, completion and failure paths.
+Read after [result processing](../02-components/09-result-processing.md) and [Storage](../02-components/08-storage.md). This case follows `Prepared`, direct signing, peer evidence and `Storage::commit` through timing, completion and failure paths.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../04-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
 
@@ -68,6 +68,6 @@ sequenceDiagram
 
 The full subject binds the exact input/range, canonical predecessor state, runtime and result. Equal state roots alone do not make two subjects equal. Each identity counts once under the relevant epoch membership. Honest signers directly execute and validate the subject; relaying an imported certificate cannot create local direct-execution provenance.
 
-The f+1 result threshold is separate from native Multimmit quorums and the 2f+1 intention-prefix support rule. Reports are not result proofs. Result certification does not wait for Baton approval or gate native cut formation. Common signing boundaries, wire encoding, result transport limits and cryptographic scheme remain undecided. [Certification responsibilities](../02-components/10-result-processing.md)
+The f+1 result threshold is separate from native Multimmit quorums and the 2f+1 intention-prefix support rule. Reports are not result proofs. Result certification does not wait for Baton approval or gate native cut formation. Common signing boundaries, wire encoding, result transport limits and cryptographic scheme remain undecided. [Certification responsibilities](../02-components/09-result-processing.md)
 
 A certified result consumer still distinguishes certificate verification, local readable state and durable applied state. Queries must identify the selected state and result contract. Required outputs and intermediate boundaries must remain available under an explicit retention policy; a root by itself cannot reprovide them. [QMDB and retention](../04-reference/03-qmdb.md)

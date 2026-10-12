@@ -32,7 +32,7 @@
     },
     {
       "group": "전체 구조",
-      "path": "02-components/12-networking.md",
+      "path": "02-components/10-networking.md",
       "title": "P2P와 메시지 경로",
       "original_sections": [
         "1.6"
@@ -61,7 +61,7 @@
     },
     {
       "group": "Tx 레이어",
-      "path": "02-components/06-tx-pool.md",
+      "path": "02-components/05-tx-pool.md",
       "title": "Tx 인터페이스",
       "original_sections": [
         "3.2"
@@ -119,7 +119,7 @@
     },
     {
       "group": "Baton 레이어",
-      "path": "02-components/07-alignment.md",
+      "path": "02-components/06-alignment.md",
       "title": "Direction 선택과 재실행",
       "original_sections": [
         "5.4",
@@ -131,7 +131,7 @@
     },
     {
       "group": "Baton 레이어",
-      "path": "02-components/05-app-callbacks.md",
+      "path": "02-components/04-app-coordination.md",
       "title": "Baton 인터페이스와 로컬 진행 알림",
       "original_sections": [
         "5.2",
@@ -141,7 +141,7 @@
     },
     {
       "group": "Execution 레이어",
-      "path": "02-components/08-executor.md",
+      "path": "02-components/07-executor.md",
       "title": "Execution: 역할과 책임",
       "original_sections": [
         "6.1",
@@ -151,7 +151,7 @@
     },
     {
       "group": "Execution 레이어",
-      "path": "02-components/10-result-processing.md",
+      "path": "02-components/09-result-processing.md",
       "title": "Executor·Runtime·결과 인증 인터페이스",
       "original_sections": [
         "6.2",
@@ -172,7 +172,7 @@
     },
     {
       "group": "Execution 레이어",
-      "path": "02-components/11-state-sync.md",
+      "path": "02-components/09-result-processing.md",
       "title": "State sync: 인증된 실행 결과로 상태 동기",
       "original_sections": [
         "6.7"

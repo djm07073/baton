@@ -4,6 +4,22 @@
 
 **TxPool retains transactions and supplies bounded batches for local proposals.** It owns admission, selected/unselected classification, duplicate handling and canonical maintenance. App callbacks call its concrete operations; these do not require a public TxPool trait.
 
+## Transaction lifecycle
+
+```mermaid
+flowchart TB
+    I["Client / peer transaction"] -->|"[A] pool.admit"| V{"Valid payload?"}
+    V -->|"No"| X["Reject"]
+    V -->|"Yes"| C["Retain selected / unselected candidates"]
+    C -->|"[A] pool.select<br/>selected candidates only"| B["Retained bounded batch"]
+    B -->|"[C] TransactionBlock::from_context"| P["Proposal body"]
+    D["Certified durable outcomes"] -->|"[A] pool.reconcile"| C
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-27.svg) · [PNG](../assets/diagrams/diagram-27.png)
+
+Selection preserves the chosen bytes. Canonical maintenance follows durable outcomes, so selecting or proposing a transaction does not retire it.
+
 <a id="interface-overview"></a>
 
 ## Communication interfaces
@@ -22,15 +38,7 @@ Selection uses the supplied Multimmit producer context. Its `parent` is a produc
 
 Local pool membership, selection and readiness govern this node's proposals; peer or canonical blocks are validated under the agreed payload rules without requiring their transactions to have been locally admitted or selected.
 
-```text
-app.handle_propose(context):
-    txs = pool.select(context, configured limits)
-    body = encode stable selected bytes
-    block = TransactionBlock::from_context(context, body)
-    custody = await marshal.stage_block(block)
-    retain accepted body/custody association
-    reply with body digest
-```
+The [proposal flow diagram](05-app-callbacks.md#automatonpropose-pool-to-staged-block) shows selection → block construction → staging → body-digest reply.
 
 This is App-internal proposal code. Follow the canonical [verify handler](05-app-callbacks.md#automatonverify-validity-custody-and-scheduling) and [Update handler](05-app-callbacks.md#marshal-reportupdate-canonical-input-and-ack) for scheduling, reconciliation and ACK. Pool maintenance consumes recoverable durable outcomes; it adds no required pool-processing ACK to canonical delivery or native consensus. Reconcile missed maintenance before relying on the backend's readiness state.
 

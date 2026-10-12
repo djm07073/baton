@@ -1,0 +1,8 @@
+flowchart TB
+    P["Prepared root + exact context<br/>own direct-execution evidence"] --> S["[A] results.sign<br/>exchange attestations"]
+    S --> V{"[A] results.accept"}
+    P2["wire: Peer ExecutionCertificate"] --> V
+    V -->|"Invalid subject / signer"| R["Reject evidence"]
+    V -->|"Context or f+1 missing"| W["Keep pending<br/>no apply or ACK"]
+    V -->|"f+1 valid distinct same-subject signatures"| C["[P] Storage::commit(verified)"]
+    C --> D["Storage matches material and persists<br/>[P] Committed"]

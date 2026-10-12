@@ -1,0 +1,12 @@
+sequenceDiagram
+    participant M as Marshal
+    participant A as App owner
+    participant S as Executor + Storage
+    M->>A: [C] report(Update)
+    A-->>M: Feedback after retaining block and ACK
+    Note over M,A: Native consensus continues, delivery window is bounded
+    A->>S: [A] Reconcile exact ordered input
+    Note over S: Execute or import, certify f+1, persist
+    S-->>A: [P] StorageEvent::Committed
+    A->>M: [C] acknowledgement.acknowledge()
+    Note over M: Persist contiguous ACK cursor separately

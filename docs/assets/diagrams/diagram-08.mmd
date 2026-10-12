@@ -20,16 +20,18 @@ sequenceDiagram
         E-->>A: StateChanges: reuse / finish / repair
         A->>S: [P] Storage::submit(executed, changes)
         S-->>A: Ok(()), retained but not durable
-        S-->>A: [P] StorageEvent::Prepared(prepared)
-        A->>A: [A] App result path obtains certificate evidence
+        S-->>E: [P] StorageEvent::Prepared(prepared), via App routing
+        E->>E: [A] results.sign(statement, direct_evidence)
+        Note over E: Exchange peer attestations for the same full subject
+        E->>E: [A] results.accept(evidence, canonical_context) -> verified or pending
 
         alt Certificate unavailable
             Note over A,S: Keep prepared work, no canonical state apply or ACK
         else Certificate and prepared material available
-            A->>S: [P] Storage::certify(certificate)
-            S-->>A: Ok(()), admitted for verification, not durable
+            E->>S: [P] Storage::commit(verified)
+            S-->>E: Ok(()), commit accepted, not durable
             S-->>A: [P] StorageEvent::Committed(applied) or StorageEvent::Failed(failure)
-            Note over A,S: Verify f+1, subject, material and predecessor, failure has no ACK
+            Note over E,S: Executor verified f+1, Storage matches material and predecessor, failure has no ACK
             opt Durable success
                 A->>A: [A] app.publish_applied(applied)
                 A->>E: [A] execution.install_checkpoint(applied.checkpoint)

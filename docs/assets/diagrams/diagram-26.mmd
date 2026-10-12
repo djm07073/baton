@@ -1,0 +1,8 @@
+flowchart TB
+    N["Multimmit"] -->|"[C] Automaton::propose / verify"| A["App owner<br/>retained inputs and lifecycle"]
+    M["Marshal"] <-->|"[C] report(Update) / ACK after durability"| A
+    A <-->|"[P] admit / commit<br/>[P, internal] next → JobIntent"| L["Alignment"]
+    A -->|"[A] claim, execute / reconcile"| E["Executor<br/>checkpoints + f+1 certification"]
+    E -->|"[P] read / submit / commit"| S["Storage"]
+    S -->|"[P] Prepared"| E
+    S -->|"[P] Committed"| A

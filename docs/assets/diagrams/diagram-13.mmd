@@ -10,6 +10,18 @@ sequenceDiagram
     O->>W: [C] network.start()
     O->>A: [A] app.open(config) -> callback handles
     A->>S: [A] state.recover(config), or configured genesis
+    S-->>A: RecoveredState: checkpoint candidate and original evidence
+    alt Non-genesis recovered state
+        A->>E: [A] results.accept(recovered.evidence, recovered.context)
+        E-->>A: VerifiedCertificate or recovery failure
+        break Invalid or unresolved recovered evidence
+            Note over A,E: Stop startup, no Committed or ACK
+        end
+        E->>S: [P] Storage::commit(verified), confirm recovered durable record
+        S-->>E: Ok(()), matching record accepted
+    else Configured genesis
+        Note over A,S: Configured trusted initial state, no execution certificate
+    end
     S-->>A: [P] StorageEvent::Committed(recovered), checkpoint with pinned StateView
     A->>E: [A] execution.install_checkpoint(recovered.checkpoint)
     Note over O,A: Retained Update ingress exists now, speculative lifecycle stays recovering

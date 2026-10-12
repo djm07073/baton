@@ -4,6 +4,21 @@
 
 **Multimmit owns native signing, voting and finality.** The App provides payloads and validity/custody verdicts. Marshal consumes native activity to retain and deliver the ordinary finalized total order.
 
+## Native path at a glance
+
+```mermaid
+flowchart TB
+    A["App<br/>[C] propose + verify"] -->|"body digest + custody verdict"| P["Native producer<br/>signed lane header"]
+    P --> D["Native availability / DA"]
+    D --> L["Leader proposal<br/>native voting and finality"]
+    L -->|"[C] Reporter::report(Activity)"| M["Marshal<br/>history, bodies, canonical order"]
+    M -->|"[C] Reporter::report(Update)"| E["App canonical worker"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-36.svg) · [PNG](../assets/diagrams/diagram-36.png)
+
+The diagram groups native protocol phases; the detailed sequence below shows their messages. App execution certification is a later, separate responsibility.
+
 <a id="normal-native-consensus-producer-da--leader-proposal--finality"></a>
 
 Read after [Multimmit](../02-components/01-multimmit.md) and [Marshal delivery](../02-components/03-marshal-delivery.md). This case follows Automaton, native Activity and the final Update handoff through timing, completion and failure paths.
@@ -13,6 +28,9 @@ Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned process
 ## Native producer, DA and view/finality paths
 
 This diagram highlights the App connections. Native protocol details remain in the [consensus source map](../02-components/01-multimmit.md).
+
+<details>
+<summary>Detailed interface sequence</summary>
 
 ```mermaid
 sequenceDiagram
@@ -49,6 +67,8 @@ sequenceDiagram
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-15.svg)
+
+</details>
 
 The App's speculative execution is independent of the native DA path after successful validity/custody verification. Neither speculative worker completion nor application delivery ACK is a native vote/cut prerequisite. Native availability, ancestry and durability gates still apply; the body validity callback is not permission to bypass them.
 

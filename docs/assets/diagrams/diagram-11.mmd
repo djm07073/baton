@@ -1,9 +1,9 @@
 sequenceDiagram
-    participant A as App result processing
+    participant A as Executor / result processing
     participant S as Storage
     participant P as Peer Validator App
     participant R as Result consumer
-    A->>A: Retain StateChanges from accepted direct Executor job
+    A->>A: Retain StateChanges and accepted direct-job identity
     A->>S: [P] Storage::submit(executed, changes)
     S-->>A: Ok(()), retained but not durable
     S-->>A: [P] StorageEvent::Prepared(prepared)
@@ -12,16 +12,16 @@ sequenceDiagram
     A-->>P: wire: ExecutionAttestation(statement, signature)
     P-->>A: wire: ExecutionAttestation or ExecutionCertificate
     A->>A: [A] results.accept(evidence, canonical_context)
-    alt VerifiedCertificate: f+1 distinct eligible same-statement signatures
+    alt VerifiedCertificate (verified): f+1 distinct eligible same-statement signatures
         A-->>R: wire: ExecutionCertificate(statement, signatures)
-        R->>R: [A] results.accept(certificate, canonical_context)
-        A->>S: [P] Storage::certify(certificate)
-        S-->>A: Ok(()), admitted for verification, not durable
-        Note over A,S: Storage verifies evidence, batches persistence, then emits Committed
+        R->>R: Verify received certificate and exact context
+        A->>S: [P] Storage::commit(verified)
+        S-->>A: Ok(()), commit accepted, not durable
+        Note over A,S: Storage matches verified subject and material, batches persistence, then emits Committed
     else Incomplete or context still unresolved
         Note over A: Retain prepared work, no canonical apply or ACK
     else Invalid evidence
         Note over A: Reject, do not count its identity
     end
-    Note over A,S: Sign before state application, then certify, apply durably and ACK
+    Note over A,S: Sign before state application, then commit, apply durably and ACK through the Update owner
     Note over A,P: Imported work cannot produce own direct-execution signature

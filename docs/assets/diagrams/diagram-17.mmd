@@ -1,15 +1,17 @@
 flowchart TB
     M["Multimmit Marshal"] <-->|"[C] report(Update) / ACK"| A["App canonical owner"]
-    A <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges<br/>execution.install_checkpoint: local adoption"| E["App Executor<br/>in-memory overlays and checkpoints"]
+    A <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges<br/>execution.install_checkpoint: local adoption"| E["App Executor<br/>execution, checkpoints and f+1 certification"]
     subgraph S["Storage"]
         R["Pinned read views"]
         P["Selected material and root preparation"]
-        W["Verify f+1 and material<br/>single canonical writer"]
+        B["Concrete QMDB batches"]
+        W["Match verified subject and material<br/>single canonical writer"]
     end
-    A <-->|"[P] Storage::submit(executed, changes)<br/>Ok(()), later StorageEvent::Prepared"| P
-    P -->|"[C] new_batches / fork_batches<br/>[A] materialize StateChanges<br/>[C] merkleize"| B["Concrete QMDB batches"]
-    B -->|"Sealed material"| W
-    A -->|"[P] Storage::certify(certificate)"| W
+    A <-->|"[P] Storage::submit(executed, changes)<br/>Ok(()) accepts the handoff"| P
+    P -->|"[P] StorageEvent::Prepared"| E
+    P -->|"[C] new_batches / fork_batches<br/>[A] materialize StateChanges<br/>[C] merkleize"| B
+    B --> W
+    E -->|"[P] Storage::commit(verified)"| W
     W <-->|"[C] apply / finalize<br/>Barrier::durable() == true"| D["DatabaseSet / QMDB"]
     W -->|"[P] StorageEvent::Committed(applied)<br/>after batched durability"| A
     E <-->|"[P] Storage::read(view, key)<br/>pinned cold state"| R

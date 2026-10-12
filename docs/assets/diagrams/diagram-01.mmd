@@ -8,11 +8,14 @@ flowchart TB
             M <-->|"[P] Alignment::admit / commit(ordered)<br/>internal AlignmentPolicy::next"| S["PreCutAlignment<br/>or BatonAlignment<br/>pub(crate) implementations"]
         end
         P["App pool and payload code"]
-        E["App Executor<br/>execution and in-memory checkpoints"]
-        C["Storage<br/>cold reads, certification and persistence"]
+        E["App Executor<br/>execution, checkpoints and certification"]
+        C["Storage<br/>cold reads, roots and persistence"]
         M -->|"[A] pool.select(ctx, limits)"| P
         M <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges"| E
-        M <-->|"[P] Storage::submit / certify<br/>StorageEvent::Prepared / Committed"| C
+        M -->|"[P] Storage::submit(executed, changes)"| C
+        C -->|"[P] StorageEvent::Prepared"| E
+        E -->|"[P] Storage::commit(verified)"| C
+        C -->|"[P] StorageEvent::Committed"| M
         E <-->|"[P] Storage::read(view, key)<br/>pinned cold state"| C
         C -->|"[A] via App owner<br/>execution.install_checkpoint"| E
     end

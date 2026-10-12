@@ -1,0 +1,11 @@
+flowchart TB
+    U["[C] Reporter::report(Update)"] --> O["[A] Retain indexed block + Exact token<br/>[P] Alignment::commit(ordered)"]
+    O --> F["Return Feedback promptly"]
+    O --> C["[A] Canonical worker<br/>exact recovered replay, direct work or import"]
+    C -->|"direct work"| E["[A] execution.reconcile whole unit<br/>[P] await Storage::submit acceptance"]
+    E -->|"Ok: handoff complete"| N["Worker may take next ordered unit"]
+    E -->|"[P] Prepared + direct signing"| V["Executor verifies f+1<br/>[P] Storage::commit(verified)"]
+    C -->|"verified import"| V
+    V -->|"[P] Committed"| D["[A] app.publish_applied<br/>retain checkpoint, refresh state / pool"]
+    D --> A["[C] ACK exactly covered Updates"]
+    C -->|"exact certified durable replay"| A

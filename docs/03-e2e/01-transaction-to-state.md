@@ -4,6 +4,24 @@
 
 **One App owns the transaction pool, scheduler and transaction execution.** Multimmit calls the App through `Automaton`; Marshal stores and broadcasts complete blocks and delivers their finalized order through `Reporter<Update>`. App storage applies the matching execution result durably.
 
+## Whole path at a glance
+
+```mermaid
+flowchart TB
+    T["Transaction"] -->|"[A] pool.admit / select"| B["[C] Automaton::propose<br/>stage full block"]
+    B --> V["[C] Automaton::verify<br/>validity + durable custody"]
+    V -->|"eligible candidate"| X["[P] admit / internal next<br/>early execution"]
+    V --> N["Native signing / DA / finality"]
+    N -->|"[C] report(Update)"| O["Canonical execution<br/>reuse or repair exact order"]
+    X -.->|"matching work"| O
+    O -->|"[P] submit → Prepared"| C["Executor f+1 certification<br/>[P] Storage::commit"]
+    C -->|"[P] Committed"| A["Install checkpoint + ACK"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-34.svg) · [PNG](../assets/diagrams/diagram-34.png)
+
+The early-execution branch is optional. Canonical delivery can be the App’s first encounter with a block and never depends on prior speculation.
+
 Read after [component responsibilities and communication](../01-overview/01-architecture.md#responsibilities-and-communication). This case follows `propose/verify`, Alignment admission/selection, `report(Update)` and Storage requests/events through timing, completion and failure paths.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../04-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
@@ -11,6 +29,9 @@ Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned process
 ## Full E2E: transaction input to canonical state
 
 This successful path shows one possible completion order. Verification errors and pending data are expanded in [body exchange](02-block-exchange.md); replay, gaps and apply failures are expanded in [canonical application](06-ordered-application.md).
+
+<details>
+<summary>Detailed interface sequence</summary>
 
 ```mermaid
 sequenceDiagram
@@ -60,13 +81,15 @@ sequenceDiagram
     E-->>A: StateChanges: reuse / finish / repair
     A->>S: [P] Storage::submit(executed, changes)
     S-->>A: Ok(()), retained but not durable
-    S-->>A: [P] StorageEvent::Prepared(prepared)
-    A->>A: [A] App result path obtains certificate evidence
+    S-->>E: [P] StorageEvent::Prepared(prepared), via App routing
+    E->>E: [A] results.sign(statement, direct_evidence)
+    Note over E: Exchange peer attestations for the same full subject
+    E->>E: [A] results.accept(evidence, canonical_context) -> verified or pending
 
     Note over A,S: Missing certification keeps work pending before state application
-    A->>S: [P] Storage::certify(certificate)
-    S-->>A: Ok(()), admitted for verification, not durable
-    S->>S: Verify f+1, subject, material and current base, apply durably
+    E->>S: [P] Storage::commit(verified)
+    S-->>E: Ok(()), commit accepted, not durable
+    S->>S: Match verified subject, prepared material and current base, apply durably
     S-->>A: [P] StorageEvent::Committed(applied)
     A->>A: [A] app.publish_applied(applied)
     A->>E: [A] execution.install_checkpoint(applied.checkpoint)
@@ -76,13 +99,20 @@ sequenceDiagram
 
 [Open full-size diagram](../assets/diagrams/diagram-02.svg)
 
+</details>
+
 Speculative execution may finish before or after `Update` arrives. `verify(true)` establishes payload validity and custody; it does not wait for that execution. For local blocks, candidate admission must respect the fact that this verify occurs before native header signing. The [callback contract](../02-components/05-app-callbacks.md) covers peer, local and recovery requests.
+
+For direct canonical work, the App worker awaits the selected unit's execution/reuse and then `Storage::submit` acceptance before advancing to the next ordered unit. The `Ok(())` reply in the diagram ends that synchronous handoff; later preparation, certification and disk flush remain independent. See [execution-to-Storage completion](../02-components/08-executor.md#execution-to-storage-completion).
 
 Marshal already delivers the ordinary native total order. The App reconciles retained work against these Updates and its canonical worker applies their exact sequence. It does not sort Updates again or require an earlier speculative candidate. In Baton mode, reports and direction operate alongside this path; native proposal-policy integration remains [open](../04-reference/05-native-open-decisions.md).
 
-`Alignment::commit(ordered)` records ordering before execution or certification completes. Storage then requires a matching `f+1` result certificate before canonical state application, for direct work and imports alike. Completed speculation may remove computation, but cannot bypass certification. Native cut formation continues independently; insufficient signatures retain pending work and withhold state application and ACK. Bounded multi-block signing follows the certification-unit contract without waiting for per-block application inside the unit.
+`Alignment::commit(ordered)` records ordering before execution or certification completes. Executor then verifies a matching `f+1` result certificate before requesting Storage commit, for direct work and imports alike. Completed speculation may remove computation, but cannot bypass certification. Native cut formation continues independently; insufficient signatures retain pending work and withhold state application and ACK. Bounded multi-block signing follows the certification-unit contract without waiting for per-block application inside the unit.
 
 ## Tx lifecycle: new, duplicate, and invalid transactions
+
+<details>
+<summary>Detailed interface sequence</summary>
 
 ```mermaid
 sequenceDiagram
@@ -111,6 +141,8 @@ sequenceDiagram
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-03.svg)
+
+</details>
 
 `admit` and `select` name App-internal pool operations, not a new public consensus trait. Selected/unselected are logical classes; their physical representation and policy remain open. RPC and peer input use the same validation and admission policy. Duplicate suppression in one pool does not establish global exactly-once execution when multiple producers include the same transaction.
 

@@ -4,6 +4,24 @@
 
 **Use the existing Multimmit Marshal for complete-block custody and exchange.** The App defines the transaction body codec, digest and validity checks. Native Multimmit handles signed producer headers, DA and ordering; the body travels through Marshal's buffered broadcast and backfill services.
 
+## Publication and retrieval at a glance
+
+```mermaid
+flowchart TB
+    P["[C] Automaton::propose"] --> S["[C] Marshal.stage_block"]
+    S --> V["Local verify confirms custody"]
+    V --> H["Native signs header"]
+    H -->|"[C] Relay::broadcast"| B["Marshal sends full block"]
+    H --> R["Native sends signed header"]
+    B --> A["Peer verify<br/>subscribe / fetch exact block"]
+    R --> A
+    A --> C["Valid payload + durable custody<br/>[C] verdict_reply.send(true)"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-35.svg) · [PNG](../assets/diagrams/diagram-35.png)
+
+Header and body use separate paths. Their arrival order is independent; the receiver resolves them using the exact BlockRef.
+
 Read after [Marshal custody](../02-components/02-marshal-custody.md) and [App callbacks](../02-components/05-app-callbacks.md). This case follows `stage_block`, `Relay::broadcast`, `subscribe_block/fetch_block` and the verification reply through timing, completion and failure paths.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../04-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
@@ -11,6 +29,9 @@ Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned process
 ## Block lifecycle: mempool → propose → body dissemination
 
 This is the successful local proposal path; the next diagram expands validation, pending data and custody failure.
+
+<details>
+<summary>Detailed interface sequence</summary>
 
 ```mermaid
 sequenceDiagram
@@ -48,11 +69,16 @@ sequenceDiagram
 
 [Open full-size diagram](../assets/diagrams/diagram-04.svg)
 
+</details>
+
 `stage_block().await` returns a `Custody` token after admission of storage work. Awaiting `Custody::wait()` establishes durable recovery; `put_block()` combines staging and that wait. Dropping the token does not cancel accepted storage work. The local native custody verify provides the required gate before header signing. An App may wait earlier in propose, but need not add a second durability path. [Marshal mailbox](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/mailbox.rs#L327)
 
 The body digest commits to the payload. The header digest identifies the native producer block, including its producer Context and body digest. `propose` returns the body digest; native `Relay::broadcast` requests propagation using the header digest. The existing Marshal Relay resolves that digest to the staged complete block. Its local Feedback does not prove remote receipt or custody, and even `Ok` can mean no matching staged block was found. [Relay completion](../02-components/12-networking.md)
 
 ## Body lookup, verification, and missing-content handling
+
+<details>
+<summary>Detailed interface sequence</summary>
 
 ```mermaid
 sequenceDiagram
@@ -103,6 +129,8 @@ sequenceDiagram
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-05.svg)
+
+</details>
 
 `subscribe_block` waits for local storage or buffered ingress to establish custody. It does not initiate peer fetch; DA evidence may independently cause Marshal backfill. `fetch_block` is the explicit network retrieval API and can return buffered bytes before storage sync; a fetch response alone does not establish custody. A wrong peer response is not proof that the expected payload itself is permanently invalid. Local storage failure is also distinct from invalid peer content.
 

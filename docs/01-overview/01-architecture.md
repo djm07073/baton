@@ -17,11 +17,14 @@ flowchart TB
             M <-->|"[P] Alignment::admit / commit(ordered)<br/>internal AlignmentPolicy::next"| S["PreCutAlignment<br/>or BatonAlignment<br/>pub(crate) implementations"]
         end
         P["App pool and payload code"]
-        E["App Executor<br/>execution and in-memory checkpoints"]
-        C["Storage<br/>cold reads, certification and persistence"]
+        E["App Executor<br/>execution, checkpoints and certification"]
+        C["Storage<br/>cold reads, roots and persistence"]
         M -->|"[A] pool.select(ctx, limits)"| P
         M <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges"| E
-        M <-->|"[P] Storage::submit / certify<br/>StorageEvent::Prepared / Committed"| C
+        M -->|"[P] Storage::submit(executed, changes)"| C
+        C -->|"[P] StorageEvent::Prepared"| E
+        E -->|"[P] Storage::commit(verified)"| C
+        C -->|"[P] StorageEvent::Committed"| M
         E <-->|"[P] Storage::read(view, key)<br/>pinned cold state"| C
         C -->|"[A] via App owner<br/>execution.install_checkpoint"| E
     end
@@ -34,7 +37,7 @@ flowchart TB
 
 [Open full-size diagram](../assets/diagrams/diagram-01.svg)
 
-Blue boxes are existing components. Green boxes separate App pool, Alignment, Executor and Storage responsibilities; they can share one owner and concrete handles. The [interface map](../04-reference/01-communication-contracts.md#proposed-alignment-interface) separates public `Alignment` calls from crate-internal `AlignmentPolicy::next`. Both alignment implementations share those contracts and use the separate public [`Storage`](../04-reference/01-communication-contracts.md#proposed-storage-interface) contract for certificate verification and durable application. The diagram does not prescribe one actor per box. Executor workers compute in memory; Storage owns storage I/O. Both keep slow work off short callback handlers. Commonware runtime and authenticated P2P supply task and transport mechanisms.
+Blue boxes are existing components. Green boxes separate App pool, Alignment, Executor and Storage responsibilities; they can share one owner and concrete handles. The [interface map](../04-reference/01-communication-contracts.md#proposed-alignment-interface) separates public `Alignment` calls from crate-internal `AlignmentPolicy::next`. Both alignment implementations share those contracts and use the separate public [`Storage`](../04-reference/01-communication-contracts.md#proposed-storage-interface) contract for prepared roots and Executor-authorized durable application. The diagram does not prescribe one actor per box. Executor workers compute in memory; Storage owns storage I/O. Both keep slow work off short callback handlers. Commonware runtime and authenticated P2P supply task and transport mechanisms.
 
 <a id="four-layers"></a>
 
@@ -49,9 +52,9 @@ Blue boxes are existing components. Green boxes separate App pool, Alignment, Ex
 | [App coordination](../02-components/04-app-coordination.md) | Callback intake, lifecycle, claimed dispatch and Update tokens | Connects pool, policy, execution, result processing and Storage |
 | [TxPool](../02-components/06-tx-pool.md) | Admission, retained candidates and bounded selection | Transactions in; proposal batches out; durable outcomes for maintenance |
 | [Alignment](../02-components/07-alignment.md) | Eligible pending work and finalized-order reflection | `admit/commit`; internal `next` selects an intent from the execution view |
-| [Executor](../02-components/08-executor.md) | Transaction computation and in-memory checkpoints | Exact-parent jobs, StateChanges, pinned cold reads and checkpoint installation |
-| [Storage](../02-components/09-storage.md) | Roots, certificate verification, persistence and recovery | `read/submit/certify`; `Prepared/Committed/Failed` events |
-| [App result processing](../02-components/10-result-processing.md) | Direct signing and peer signature collection | Executor evidence + Storage commitments → certificate for Storage |
+| [Executor](../02-components/08-executor.md) | Transaction computation, checkpoints and result certification | Exact-parent jobs, StateChanges, prepared roots, verified commit requests and checkpoint installation |
+| [Storage](../02-components/09-storage.md) | Roots, material checks, persistence and recovery | `read/submit/commit`; `Prepared/Committed/Failed` events |
+| [Executor result processing](../02-components/10-result-processing.md) | Signing and certificate verification inside Executor | Direct evidence + prepared state root + matching peer signatures → verified Storage commit request |
 
 The current source is [Commonware checkout 6233438](https://github.com/0xEyrie/monorepo/tree/6233438985d8249d2b2bc1204191d5d405652288). Current Multimmit Marshal replaces the older proposed application body service and ordinary Baton-owned order-delivery machinery. Historical research pinned to `534af0e` remains useful for its stated questions, but does not describe this new assembly.
 
@@ -70,7 +73,7 @@ The current source is [Commonware checkout 6233438](https://github.com/0xEyrie/m
 | Speculation | Usable candidate → App scheduler → exact-parent execution | Completed local effects for a particular path |
 | Baton control | Intended-order report → bounded selection → advisory direction | Execution intention; no finality or result proof |
 | Canonical delivery | Native history → Marshal → indexed Update → Alignment::commit(ordered) | Continuous finalized ordering, independent of execution progress |
-| Application durability | Executor effects → Storage preparation → App result collection → Storage Committed event → ACK | Recoverable certified state, outputs, certificate evidence and applied position |
+| Application durability | Executor effects → Storage preparation → Executor certification → Storage Committed event → ACK | Recoverable certified state, outputs, certificate evidence and applied position |
 | Execution catch-up | Storage checkpoint → App owner → Executor installation | Skip the exact covered input and resume from its usable state view |
 | Result certification | Peer Apps exchange signatures over the exact statement | `f+1` matching distinct signatures plus irrevocable order/base establish the research result endpoint |
 

@@ -1,0 +1,14 @@
+sequenceDiagram
+    participant E as Executor
+    participant S as Storage
+    participant A as App owner
+    E->>S: [P] submit(executed, StateChanges)
+    S-->>E: Ok: retained
+    S-->>E: [P] Prepared(root and exact context)
+    Note over E: Sign, collect and verify f+1
+    E->>S: [P] commit(verified)
+    S-->>E: Ok: commit work accepted
+    Note over S: Match material / predecessor, apply and flush
+    S-->>A: [P] Committed(checkpoint)
+    A->>E: [A] execution.install_checkpoint
+    Note over A: ACK only covered Marshal Updates

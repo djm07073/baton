@@ -10,20 +10,6 @@ Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned process
 
 <a id="roles-and-responsibilities"></a>
 
-## Communication interfaces
-
-| Existing boundary | Caller → implementation | App work |
-|---|---|---|
-| `Automaton::propose(Context)` | Engine → App ingress | Select transactions, build/stage a complete block, return its **body digest** |
-| `Automaton::verify(Context, body_digest)` | Engine → App ingress | Obtain exact durable custody, validate payload, record eligible speculative work, resolve the verdict without waiting for execution |
-| `Relay::broadcast(header_digest, ())` | Engine → existing Marshal Relay | Reuse the supplied Relay to broadcast the staged complete block |
-| `Reporter<Activity>` | Engine → Marshal and optional App observer | Marshal consumes native observations; App may use them for candidate provenance/telemetry |
-| `Reporter<Update<Block>>` | Marshal → App output ingress | Accept canonical index/block, reconcile execution, durably apply, acknowledge |
-
-These are shared Commonware traits. Pass Marshal's mailbox directly as Engine's reporter. If App also consumes native Activity, use a separate typed handle from its finalized Update reporter: `Reporter` has one associated Activity type, even when both handles reach the same App owner. The existing [example assembly](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/examples/log-multimmit/src/node.rs#L260) shows the optional fanout. No additional public BlockService, Executor or Orderer trait is required.
-
-Multimmit uses `n ≥ 5f+1`; Baton comparisons use `n=5f+1`. Keep native tip extraction, extension, signing and recovery. App transaction execution is separate from the private native `AppExecutor`, which dispatches local `propose`/`verify` jobs and returns completions to the machine. [Application contract and fault model](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/mod.rs#L50), [callback executor](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/actors/voter/actor/app.rs#L64).
-
 ## Native actors and source layout
 
 ```mermaid
@@ -45,7 +31,23 @@ flowchart TB
 
 [Open full-size diagram](../assets/diagrams/diagram-16.svg)
 
-Unlabelled edges and native-transition labels show internal actor/data dependencies, not additional public method calls. The labelled App crossings use the existing interfaces in the table above.
+Unlabelled edges and native-transition labels show internal actor/data dependencies, not additional public method calls. The labelled App crossings use the existing interfaces in the communication table below.
+
+## Communication interfaces
+
+| Existing boundary | Caller → implementation | App work |
+|---|---|---|
+| `Automaton::propose(Context)` | Engine → App ingress | Select transactions, build/stage a complete block, return its **body digest** |
+| `Automaton::verify(Context, body_digest)` | Engine → App ingress | Obtain exact durable custody, validate payload, record eligible speculative work, resolve the verdict without waiting for execution |
+| `Relay::broadcast(header_digest, ())` | Engine → existing Marshal Relay | Reuse the supplied Relay to broadcast the staged complete block |
+| `Reporter<Activity>` | Engine → Marshal and optional App observer | Marshal consumes native observations; App may use them for candidate provenance/telemetry |
+| `Reporter<Update<Block>>` | Marshal → App output ingress | Accept canonical index/block, reconcile execution, durably apply, acknowledge |
+
+These are shared Commonware traits. Pass Marshal's mailbox directly as Engine's reporter. If App also consumes native Activity, use a separate typed handle from its finalized Update reporter: `Reporter` has one associated Activity type, even when both handles reach the same App owner. The existing [example assembly](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/examples/log-multimmit/src/node.rs#L260) shows the optional fanout. No additional public BlockService, Executor or Orderer trait is required.
+
+Multimmit uses `n ≥ 5f+1`; Baton comparisons use `n=5f+1`. Keep native tip extraction, extension, signing and recovery. App transaction execution is separate from the private native `AppExecutor`, which dispatches local `propose`/`verify` jobs and returns completions to the machine. [Application contract and fault model](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/mod.rs#L50), [callback executor](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/actors/voter/actor/app.rs#L64).
+
+## Native source files
 
 | Current source | Responsibility |
 |---|---|

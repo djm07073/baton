@@ -1,0 +1,13 @@
+flowchart TB
+    V["[C] Automaton::verify<br/>context + body_digest"]
+    B["[C] Marshal block lookup / subscription<br/>get_block / subscribe_block<br/>fetch_block when needed"]
+    Q{"[A] Validation result"}
+    W["[A] Keep live request pending<br/>until data arrives or native cancels"]
+    I["[A] Invalidate candidate<br/>and dependent speculative eligibility<br/>[C] verdict_reply.send(false)"]
+    C["[C] Confirm durable custody<br/>successful subscribe_block<br/>or put_block / custody.wait"]
+    V -->|"Exact BlockRef"| B
+    B --> Q
+    Q -->|"Temporary data / dependency gap"| W
+    W -->|"Available and request still live"| B
+    Q -->|"Permanently invalid"| I
+    Q -->|"Valid"| C

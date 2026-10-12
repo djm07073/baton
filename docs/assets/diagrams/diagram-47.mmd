@@ -1,0 +1,7 @@
+flowchart TB
+    I["Adversarial tx / body / peer evidence"] --> C["Custody + callback checks<br/>valid verdict, bounded intake"]
+    C --> E["Execution checks<br/>exact parents, stale-work fencing"]
+    E --> S["Certification + storage checks<br/>f+1 subject, single writer, durable linkage"]
+    S --> R["Crash / replay / import checks<br/>no double apply, correct ACK frontier"]
+    O["Sequential oracle<br/>same order + base + runtime"] --> R
+    R --> B["Fair benchmark endpoints<br/>Original / PreCut / Baton"]

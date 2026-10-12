@@ -1,0 +1,8 @@
+flowchart TB
+    O["[A] Recheck current App state<br/>retain / deduplicate useful candidates"]
+    L{"Eligible to speculate?"}
+    A["[P] Alignment::admit(candidate)<br/>[A] Wake later dispatch"]
+    T["[C] verdict_reply.send(true)"]
+    O --> L
+    L -->|"Live, unapplied and eligible"| A --> T
+    L -->|"No: skip speculation"| T

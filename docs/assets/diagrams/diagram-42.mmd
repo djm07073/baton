@@ -1,0 +1,9 @@
+flowchart TB
+    S["App ingress + Marshal custody available"] --> N["[C] Engine::open<br/>may call Automaton::verify"]
+    N --> R["[C] engine.start → running.ready"]
+    S --> C["[A] state.recover<br/>load candidate + original evidence"]
+    C --> V["Executor revalidates evidence<br/>Storage confirms durable record"]
+    V --> A["Install recovered checkpoint"]
+    R --> G["[A] app.activate<br/>native ready AND App base ready"]
+    A --> G
+    G --> D["Dispatch work<br/>reconcile / ACK exact replay"]

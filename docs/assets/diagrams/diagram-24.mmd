@@ -1,0 +1,9 @@
+flowchart TB
+    A["App<br/>TransactionBlock"] -->|"[C] stage_block"| M["Marshal custody"]
+    M -->|"[C] Custody::wait succeeds"| D["Durably recoverable block"]
+    M -->|"[C] Relay::broadcast<br/>header digest lookup"| B["Peer body channel<br/>complete block"]
+    N["Multimmit native signing"] -->|"wire: SignedTransactionBlock"| H["Peer native channel<br/>signed header"]
+    D -->|"Local verify true<br/>after payload checks"| N
+    H --> V["Peer App<br/>Automaton::verify"]
+    B -->|"[C] subscribe_block / fetch_block"| V
+    V -->|"valid payload + durable custody"| T["verdict_reply.send(true)"]

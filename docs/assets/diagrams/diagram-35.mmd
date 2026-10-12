@@ -1,0 +1,9 @@
+flowchart TB
+    P["[C] Automaton::propose"] --> S["[C] Marshal.stage_block"]
+    S --> V["Local verify confirms custody"]
+    V --> H["Native signs header"]
+    H -->|"[C] Relay::broadcast"| B["Marshal sends full block"]
+    H --> R["Native sends signed header"]
+    B --> A["Peer verify<br/>subscribe / fetch exact block"]
+    R --> A
+    A --> C["Valid payload + durable custody<br/>[C] verdict_reply.send(true)"]

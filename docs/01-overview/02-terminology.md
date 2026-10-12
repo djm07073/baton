@@ -2,6 +2,24 @@
 
 **The App owns application state and work; Multimmit and Marshal supply the existing consensus connections.** TxPool, the selected scheduler, execution workers and storage are internal responsibilities of one App. The names below do not require separate public traits, actors or crates.
 
+## Block identity and execution state
+
+```mermaid
+flowchart TB
+    B["Body<br/>application transactions"] -->|"hash"| BD["Body digest"]
+    BD --> H["Producer header<br/>epoch · lane · height · parent"]
+    H -->|"hash"| HD["Header digest"]
+    HD --> R["BlockRef<br/>lane · height · header digest"]
+    H --> F["TransactionBlock<br/>header + body"]
+    B --> F
+    F -->|"[C] report(Update)<br/>finalized order"| E["Executor<br/>exact execution parent + runtime"]
+    E -->|"[P] Storage::submit<br/>StateChanges"| S["Storage-prepared state root"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-23.svg) · [PNG](../assets/diagrams/diagram-23.png)
+
+The producer header identifies the block in its lane. The execution parent identifies the state on which that block runs; a digest or output index alone cannot replace it.
+
 ## Roles and terms
 
 | Owner or internal part | Responsibility |
@@ -13,8 +31,8 @@
 | App Pre-cut scheduler | Admit eligible pre-cut candidates, preserve started prefix and sort pending work, reconcile finalized input |
 | App Baton scheduler | The same local scheduling foundation plus intended-order reports, bounded direction selection and advisory handling |
 | App Executor | Compute transaction effects and manage in-memory checkpoints; read pinned cold state, submit StateChanges with exact ordered-range metadata and install committed checkpoints |
-| Storage | Own storage preparation, certificate verification, persistence, import/recovery and usable durable checkpoint views |
-| App result processing | Sign accepted direct work with prepared commitments and collect peer certificate evidence |
+| Storage | Own root preparation, material checks, persistence, import/recovery records and usable durable checkpoint views |
+| Executor result processing | Executor-owned signing, peer collection and full f+1 certificate verification before Storage commit |
 
 The scheduler mode is chosen for the application configuration. Pre-cut has no Baton instance, report windows, direction messages or native prefix-policy modification. Both modes use the same body, pool, execution backend and storage resources. The concrete global comparator, scheduler resource limits and backend remain open.
 
@@ -42,7 +60,7 @@ Engine [derives Validator when the configured scheme's `me()` returns a particip
 | `Alignment::commit(ordered)` | Notification of exact finalized ordering; no execution, f+1 or state-durability wait |
 | `Storage::read(view, key)` | Cold read at a pinned exact base after Executor overlays miss; unavailable view and I/O failure are errors |
 | `Storage::submit(executed, changes)` | Accepted exact ordered execution progress; retention is not durable commit or permission to prune memory |
-| `Storage::certify(certificate)` | Result-processing input to Storage for independent f+1 evidence verification; acceptance is not durable completion |
+| `Storage::commit(verified)` | Executor-verified result submitted for persistence; acceptance is not durable completion |
 | `StorageEvent::Prepared / Committed` | Ready commitments for signing / certified durable state with a usable checkpoint; only Committed permits covered Update ACKs |
 | Applied record | App's certified durable state/output/applied-index/block-identity/certificate/provenance linkage |
 | Delivery ACK | Local completion signal after matching f+1 certification and durable state application; Marshal persists its cursor separately |
@@ -59,7 +77,7 @@ The immutable ordering frontier ends the input prefix that future direction cann
 |---|---|
 | BlockService / body custody adapter | Existing Multimmit Marshal plus App body codec and validity logic |
 | Orderer / Baton confirmed delivery | Existing Multimmit Marshal for ordinary native order |
-| Earlier broad TxPool / Executor / Storage / Baton traits | Concrete pool/execution code; proposed Alignment and internal AlignmentPolicy for scheduling; Storage read/submit/certify with retained events for state access and persistence |
+| Earlier broad TxPool / Executor / Storage / Baton traits | Concrete pool/execution code; proposed Alignment and internal AlignmentPolicy for scheduling; Storage read/submit/commit with retained events for state access and persistence |
 | Planner / ResultService / Runtime | Internal bounded planning, result handling and transaction computation; Commonware runtime still supplies task/I/O primitives |
 | StoredBody / CandidateBlock events | Internal retained custody and eligibility facts; no mandatory new public event API |
 | Executor::commit / CommitResult | Internal processing of Marshal Update through the App canonical writer and durable applied record |

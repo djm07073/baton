@@ -4,6 +4,24 @@
 
 **The App scheduler decides pending work; App execution code runs it from an exact parent.** Pre-cut and Baton modes share those execution and storage mechanisms. Baton additionally receives authenticated advisory direction. Public `execute` or `reschedule` traits are unnecessary for this internal connection.
 
+## Only pending work is reordered
+
+```mermaid
+flowchart TB
+    A["A is running<br/>eligible C arrives, then B"] --> Q{"Has C started on A?"}
+    Q -->|"No"| P["F = A<br/>sort pending to B → C"]
+    P --> ABC["After exact parents complete<br/>execute A → B → C"]
+    Q -->|"Yes"| F["F = AC<br/>keep started order, B pending"]
+    F --> ACB["If ancestry permits<br/>execute A → C → B"]
+    O["Later authoritative Marshal order"] --> R["[A] execution.reconcile<br/>reuse exact prefix, repair suffix"]
+    ABC -.-> R
+    ACB -.-> R
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-38.svg) · [PNG](../assets/diagrams/diagram-38.png)
+
+This example assumes `G = A → B → C`; the actual comparator remains open. Arrival alone does not undo started work. Canonical ordering can still require repair; an advisory direction’s precedence over a conflicting started path remains open.
+
 Read after [Alignment](../02-components/07-alignment.md) and [Executor](../02-components/08-executor.md). This case follows internal `AlignmentPolicy::next`, the App claim step and `execution.execute` through timing, completion and failure paths.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../04-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
@@ -19,6 +37,9 @@ A later continuous finalized Update may require another order. The App then find
 <a id="non-leader-lifecycle-direction-and-rescheduling"></a>
 
 ## Non-leader lifecycle: direction and branch execution
+
+<details>
+<summary>Detailed interface sequence</summary>
 
 ```mermaid
 sequenceDiagram
@@ -55,6 +76,8 @@ sequenceDiagram
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-07.svg)
+
+</details>
 
 The diagram starts at direction reception; blocks must independently pass the [body validation/custody flow](02-block-exchange.md) and candidate admission before internal `AlignmentPolicy::next` can select them. The same dispatch loop uses that crate-internal trait for PreCut. A direction does not make missing bytes or an unfinished parent usable.
 

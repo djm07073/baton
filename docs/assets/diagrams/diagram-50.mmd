@@ -1,0 +1,8 @@
+flowchart TB
+    W["Candidate / completion / capacity change"] --> A["[A] App owner accepts only<br/>current, unique completion"]
+    A --> N["[P, internal] AlignmentPolicy::next(view)<br/>preserve F, sort only eligible pending"]
+    N -->|"None"| P["Keep pending until state changes"]
+    N -->|"JobIntent"| C["[A] Recheck exact parent and eligibility<br/>claim attempt + resources before launch"]
+    C -->|"Claim fails"| P
+    C -->|"Claim succeeds"| E["[A] execution.execute(job)<br/>Commonware runtime worker"]
+    E -->|"ExecutionOutcome"| A

@@ -1,0 +1,7 @@
+flowchart TB
+    N["Reuse log-multimmit node / Marshal assembly"] --> A["Implement App body + callbacks<br/>retain custody and ordered Updates"]
+    A --> E["Connect pool, Alignment and Executor<br/>exact-parent work + StateChanges"]
+    E --> S["Connect Storage + Executor certification<br/>durable checkpoint + ACK"]
+    S --> T["Deterministic E2E + crash/recovery checks"]
+    T --> B["Compare Original / PreCut / Baton<br/>same backend and endpoint"]
+    X["Full Baton: native policy design and proof"] -.-> T

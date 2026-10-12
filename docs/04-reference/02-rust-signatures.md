@@ -8,14 +8,18 @@ These are existing API excerpts from [checkout 6233438](https://github.com/0xEyr
 
 ## Modules and call flow
 
-```text
-client / tx peers -> App pool
-Multimmit -> App Automaton::propose -> pool selection -> Marshal.stage_block
-Multimmit -> App Automaton::verify -> Marshal custody -> scheduler admission
-Multimmit -> Marshal Relay + Reporter<Activity>
-Marshal -> App Reporter<Update> -> canonical worker -> durable apply -> ACK
-App scheduler -> exact-parent transaction workers -> retained effects/checkpoints
+```mermaid
+flowchart TB
+    N["Multimmit"] -->|"[C] Automaton::propose / verify"| A["App callback handles"]
+    N -->|"[C] Relay::broadcast<br/>Reporter::report(Activity)"| M["Existing Marshal"]
+    A -->|"[C] stage / subscribe / fetch block"| M
+    M -->|"[C] Reporter::report(Update)"| O["App retained Update owner"]
+    O -->|"[C] acknowledge after durable apply"| M
+    A --> P["App pool + candidate admission"]
+    O --> E["App Executor + Storage<br/>canonical state path"]
 ```
+
+[Open full-size diagram](../assets/diagrams/diagram-52.svg) · [PNG](../assets/diagrams/diagram-52.png)
 
 Both Pre-cut and Baton fit inside App. The shared canonical worker consumes Marshal's ordered-delivery contract in either mode. Baton report/direction logic has no authority to reorder the Update stream. The remaining native protected-prefix integration is described [separately](../02-components/07-alignment.md#existing-callbacks-versus-the-native-policy-gap).
 
@@ -43,7 +47,7 @@ fn verify(
 
 The body implements existing `Codec` and `Digestible` with the same hasher digest; Multimmit's blanket `Body<H>` implementation supplies the marker. Use existing `TransactionBlock<H,B>` and header types rather than another generic block trait. The producer header `parent` identifies lane ancestry, not application execution state.
 
-`CertifiableAutomaton` belongs to consensus paths with a separate certification callback, such as Simplex. Multimmit's attachment here requires Automaton; adding `certify` does not create an application execution hook for it.
+`CertifiableAutomaton` belongs to consensus paths with a separate certification callback, such as Simplex. Multimmit's attachment here requires Automaton; adding `commit` does not create an application execution hook for it.
 
 ## Reporter: two typed application connections
 
@@ -126,10 +130,10 @@ Select a concrete Pre-cut or Baton implementation at startup. Both operate on sh
 
 ## Execution and state stay inside App
 
-Transaction workers produce effects/checkpoints on exact parents. Storage prepares selected roots, applies canonical material through one writer and recovers durable checkpoints. Executor installs those checkpoints as read-only bases and skips covered input. Reuse concrete QMDB handles; keep root-deferred branching limits explicit. The proposed `Storage` contract specifies pinned cold reads, ordered StateChanges submission, certificate intake and retained Prepared/Committed events. Storage owns roots and physical batching; Executor and result collection remain concrete App code. Submission acceptance does not mean durability.
+Transaction workers produce effects/checkpoints on exact parents. Storage prepares selected roots, applies canonical material through one writer and recovers durable checkpoints. Executor installs those checkpoints as read-only bases and skips covered input. Reuse concrete QMDB handles; keep root-deferred branching limits explicit. The proposed `Storage` contract specifies pinned cold reads, ordered StateChanges submission, verified commit requests and retained Prepared/Committed events. Storage owns roots and physical batching; Executor owns signing, collection and certificate verification. Submission acceptance does not mean durability.
 
 ## Interface boundary for state finalization and state sync
 
 App's execution components exchange signatures, certificates and change sets directly over Commonware P2P. Retain full input/range, canonical base, runtime and result binding; collect `f+1` distinct eligible epoch signatures for the research result endpoint. A received certificate is not durable state, and imported material cannot become an own direct-execution signature.
 
-`Alignment::commit(ordered)` records finalized ordering without waiting for execution or signatures. Storage requires a matching verified `f+1` certificate before canonical application for both direct and imported results. Missing certification keeps prepared work pending. Imported apply also verifies material and applicability before stopping local work. The scheduler supplies no state-commit approval. Concrete VM, result wire format, safe switching and rootless branch representation remain implementation work. [Execution](../02-components/10-result-processing.md), [state backend](03-qmdb.md) and [state sync](../02-components/11-state-sync.md) detail the implementation behind the proposed [Storage contract](01-communication-contracts.md#proposed-storage-interface).
+`Alignment::commit(ordered)` records finalized ordering without waiting for execution or signatures. Executor requests Storage commit only after verifying a matching `f+1` certificate for both direct and imported results. Missing certification keeps prepared work pending. Imported apply also verifies material and applicability before stopping local work. The scheduler supplies no state-commit approval. Concrete VM, result wire format, safe switching and rootless branch representation remain implementation work. [Execution](../02-components/10-result-processing.md), [state backend](03-qmdb.md) and [state sync](../02-components/11-state-sync.md) detail the implementation behind the proposed [Storage contract](01-communication-contracts.md#proposed-storage-interface).

@@ -4,6 +4,24 @@
 
 **Use this reference to check who calls whom, what crosses the connection and what completion establishes.** Start with the [component reading path](../01-overview/01-architecture.md#responsibilities-and-communication) for responsibility summaries, then use the contracts here beside the E2E diagrams. The [Rust reference](02-rust-signatures.md) contains existing Commonware declarations.
 
+## Public calls and internal selection
+
+```mermaid
+flowchart TB
+    A["External App callers"] -->|"[P] admit(candidate)<br/>commit(ordered)"| L["pub trait Alignment"]
+    D["App dispatch"] -->|"[P, internal] next(view)"| P["pub(crate) trait AlignmentPolicy"]
+    P -->|"extends"| L
+    P -->|"JobIntent"| D
+    D -->|"[A] claim + execution.execute"| E["Executor"]
+    E -->|"[P] read / submit / commit"| S["pub trait Storage"]
+    S -->|"[P] Prepared / Committed / Failed"| O["Retained App event routing"]
+    O --> E
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-43.svg) · [PNG](../assets/diagrams/diagram-43.png)
+
+The Rust declarations below are proposed App contracts. Existing Automaton, Reporter, Relay and Marshal interfaces are listed separately; concrete helper names remain App implementation choices.
+
 Proposed App traits define shared communication contracts. Concrete helper names describe private App behavior; they do not require another public trait. PreCut and Baton share `Alignment` and the crate-internal `AlignmentPolicy`; Storage has its separate request/event contract. These proposals are not an implemented or released SDK.
 
 Using a supplied alignment implementation does not require reimplementing its traits. Adding a policy with the current `pub(crate)` contract happens inside the SDK crate; third-party policy plugins would need an explicitly public extension contract. Each method below specifies values, state changes, completion and failure behavior while leaving private decomposition to its owner.
@@ -17,9 +35,9 @@ Using a supplied alignment implementation does not require reimplementing its tr
 | **Consensus** | Multimmit producer lanes, DA, proposals, votes and native finality | Calls the existing Automaton; publishes native activity to Marshal |
 | **Alignment layer, inside App** | Automaton/Update callback handles, retained delivery tokens, lifecycle, PreCut or Baton scheduling and dispatch coordination | Requests payload work and execution; returns verify after validity/custody; ACKs exact delivery after durable application |
 | **App pool and payload code** | Transaction admission/selection and block payload checks | Supplies propose/verify without waiting for execution |
-| **App Executor, inside App** | Transaction execution, in-memory effects/overlays and speculative checkpoints | Reads pinned cold state and submits exact ordered changes; installs committed checkpoints and skips covered input |
-| **Storage, inside App** | Storage handles, root/material preparation, certificate validation, canonical persistence, recovery, import and durable checkpoint retention | Accepts submissions independently of persistence; emits `Prepared`, `Committed(DurableApplied)` and failures; supplies pinned read views |
-| **App result processing** | Direct-evidence signing and peer signature exchange/collection | Combines Executor evidence with Storage-prepared commitments; calls `Storage::certify` with collected evidence |
+| **App Executor, inside App** | Transaction execution, in-memory effects/overlays, checkpoints and result certification | Reads pinned cold state and submits exact ordered changes; installs committed checkpoints and skips covered input |
+| **Storage, inside App** | Storage handles, root/material preparation, verified-target matching, canonical persistence, recovery, import and durable checkpoint retention | Accepts submissions independently of persistence; emits `Prepared`, `Committed(DurableApplied)` and failures; supplies pinned read views |
+| **Executor result processing** | Executor-owned direct signing, peer signature collection and full certificate verification | Combines Executor evidence with Storage-prepared commitments; calls `Storage::commit` only with locally verified evidence |
 | **Existing Marshal, reused alongside these roles** | Full-block custody/relay/backfill, native history interpretation, ordered delivery and cursor | Provides mailbox/Relay interfaces and reports indexed Updates to Alignment layer |
 
 Alignment, App Executor and Storage describe separate responsibilities within one App. They can share an owner and concrete handles; the diagrams do not require a process or actor per role. The native type spelled **`AppExecutor`** runs Commonware's local Automaton callback jobs. It is different from the **App Executor** transaction-execution role designed here. The pool remains App-owned, alongside these modules.
@@ -28,7 +46,7 @@ Alignment layer implements the existing `Automaton` and `Reporter<Update>` contr
 
 ## Proposed Alignment interface
 
-**These are App-side design proposals, not existing Commonware traits.** External callers admit candidates and report finalized ordering through `Alignment`. The Alignment layer's internal dispatch loop selects work through `AlignmentPolicy`. PreCut and Baton implement both contracts, allowing the same dispatch loop to use either policy. Storage separately owns certificate verification and canonical application.
+**These are App-side design proposals, not existing Commonware traits.** External callers admit candidates and report finalized ordering through `Alignment`. The Alignment layer's internal dispatch loop selects work through `AlignmentPolicy`. PreCut and Baton implement both contracts, allowing the same dispatch loop to use either policy. Executor owns result certification; Storage owns canonical persistence.
 
 ```rust
 pub trait Alignment {
@@ -63,7 +81,7 @@ Rust visibility applies to crates and module paths, not conceptual roles. `pub(c
 
 `OrderedView` identifies the exact continuous finalized input prefix: ordering context, output indices and block identities, with sufficient linkage to the preceding known prefix. It comes from the retained local Marshal stream or an authenticated native floor/recovery prefix, not an advisory direction or peer assertion. It says nothing about execution completion or state durability. The App owner forwards new ordered progress promptly to `Alignment::commit(ordered)` and independently to canonical execution. Remove a candidate from speculative selection only once canonical intake retains the work; keep required block/checkpoint references until execution and retention rules permit release.
 
-The storage module implements [`Storage`](#proposed-storage-interface) for direct and imported results. It verifies `f+1` distinct eligible signatures on the exact ordered input/base/runtime/result before the canonical writer applies it. Only certified durable application permits Marshal ACK. `Alignment::commit` has already handled ordering and is not called again to signal state application.
+The storage module implements [`Storage`](#proposed-storage-interface) for direct and imported results. Executor verifies `f+1` distinct eligible signatures on the exact ordered input/base/runtime/state-root/result subject and requests `Storage::commit(verified)`; Storage matches prepared material and applies through one canonical writer. Only certified durable application permits Marshal ACK. `Alignment::commit` has already handled ordering and is not called again to signal state application.
 
 ### Internal selection through AlignmentPolicy
 
@@ -75,45 +93,13 @@ The storage module implements [`Storage`](#proposed-storage-interface) for direc
 
 Alignment layer handles candidate admission, execution completion and resource availability by asking `AlignmentPolicy::next` again internally. Between selection and launch it rechecks the intent against current state, atomically claims the attempt and reserves resources on the App owner, then records the updated execution view before launching. Another `next` call therefore excludes claimed work. If claim/recheck fails, refresh the view without launching; `next` changed no policy state. On failed launch or worker completion, settle the attempt through the shared lifecycle before offering capacity again. Dropping a waiter does not prove safe termination.
 
-```text
-successful verify:
-    establish payload validity and durable custody
-    refresh candidate eligibility on the Alignment layer owner
-    alignment.admit(candidate) if currently eligible
-    send true; wake dispatch without awaiting execution
+Follow these visual call paths for the lifecycle:
 
-internal dispatch after candidate / completion / capacity change:
-    intent = AlignmentPolicy::next(alignment, current scheduling view)
-    if no intent: return
-    job = recheck and claim intent, reserving resources on the App owner
-    if claim failed: refresh view and return without launch
-    publish claimed state before launching App Executor.execute(job)
-    accept completion once under exact context; settle resources safely
-    wake dispatch with the updated view
+- [Verify and admission](../02-components/05-app-callbacks.md#automatonverify-validity-custody-and-scheduling): valid payload/custody → optional candidate admission → verdict.
+- [Internal dispatch](../02-components/05-app-callbacks.md#dispatch-after-verification): `next` → owner claim → execution → current completion.
+- [Ordered application](../03-e2e/06-ordered-application.md#ordering-to-ack-at-a-glance): retained Update → ordering commit → execution/submission → Executor certification → durable state/checkpoint → ACK.
 
-on authoritative ordered Update:
-    retain the full indexed block and its ACK token
-    reflect new continuous ordering with alignment.commit(ordered view)
-    return Feedback promptly, canonical work continues independently
-
-App canonical owner, Executor and Storage:
-    reuse/execute the exact ordered range, or choose a verified peer import
-    submit(executed, StateChanges) transfers direct changes, not durability
-    continue valid in-memory execution subject to bounded resources
-
-on StorageEvent::Prepared:
-    App result processing signs matching direct work and collects evidence
-    Storage::certify(certificate) admits evidence, not durability
-
-on StorageEvent::Committed(applied):
-    publish exact durable identity and retain applied.checkpoint for Executor
-    install_checkpoint skips covered input and retires memory work safely
-    wake dispatch with the updated execution view
-    acknowledge matching retained Updates
-
-on Storage failure:
-    no ACK; retain input and resolve the cause or recover the failed instance
-```
+On Storage failure, retain the input and withhold ACK until the cause is resolved or the failed instance is recovered.
 
 `app.admit_candidate` and `app.dispatch_ready` in detailed diagrams are handlers around `Alignment::admit` and internal `AlignmentPolicy::next`. Retained ordering reaches `Alignment::commit`; later `app.publish_applied` updates execution state and wakes internal dispatch without another Alignment callback. Neither trait needs a duplicate execution-tree maintenance hook. Both concrete implementations stay inside the App crate. Neither supplies native policy adoption or reorders Marshal Updates.
 
@@ -121,9 +107,9 @@ on Storage failure:
 
 ## Proposed Storage interface
 
-`Storage` owns checkpoint-bound reads, accepted execution changes, result-root preparation, certification checks, persistence, imports and recovery. Executor owns transaction computation and in-memory checkpoints. Both PreCut and Baton use this same interface. Storage hides when and how changes become database batches or durable writes.
+`Storage` owns checkpoint-bound reads, accepted execution changes, result-root preparation, persistence, imported material and recovery records. Executor owns transaction computation, in-memory checkpoints and execution-result certification. Both PreCut and Baton use this same interface. Storage hides when and how changes become database batches or durable writes.
 
-**Executor hands over `StateChanges` plus the exact executed range; it does not construct a storage batch, root or certificate.** The App owner validates the range against retained consensus ordering and the accepted execution attempt. It can forward the call without introducing another public trait. Submission is separate from certified durable completion.
+**Executor submits `StateChanges` plus the exact executed range, receives Storage-prepared roots, creates/verifies the matching `f+1` result certificate and requests commit.** Storage constructs database batches and roots. The App owner validates the range against retained consensus ordering and the accepted execution attempt. It can forward the call without introducing another public trait. Submission is separate from certified durable completion.
 
 ```rust
 use core::future::Future;
@@ -143,10 +129,10 @@ pub trait Storage: Send + Sync {
         changes: StateChanges,
     ) -> impl Future<Output = Result<(), StorageError>> + Send;
 
-    /// Admits result evidence for verification and eventual durable application.
-    fn certify(
+    /// Accepts Executor-verified authority to persist the exact prepared result.
+    fn commit(
         &self,
-        certificate: ExecutionCertificate,
+        verified: VerifiedCertificate,
     ) -> impl Future<Output = Result<(), StorageError>> + Send;
 }
 
@@ -163,10 +149,12 @@ This is a proposed App SDK interface, not an existing Commonware trait or implem
 |---|---|
 | Executor → `read(view, key)` | On an in-memory miss, read the exact pinned base. `None` means verified absence at that view; unavailable/pruned views and I/O failure are errors, never absence or fallback to the newest state. |
 | Executor → `submit(executed, changes)` | Transfer a complete, exact-parent executed range within known continuous finalized ordering. `Ok(())` means bounded retention accepted, not a root, certificate, durable state or permission to ACK/prune checkpoints. |
-| App result processing → `certify(certificate)` | Supply original matching result evidence. `Ok(())` means accepted for processing, not durable completion. Storage independently verifies eligible distinct `f+1` signatures, subject, material and order before application. |
-| Storage → `Prepared(prepared)` | Commitments for an exact accepted signing unit are ready. App result handling may sign only with matching retained direct-execution evidence, then collect peer signatures. |
+| Executor → `commit(verified)` | Request persistence after Executor verifies eligible distinct `f+1` signatures and the full result subject. `Ok(())` means accepted commit work, not durability. Storage matches the verified subject to retained material, ordering and the current predecessor before mutation. |
+| Storage → `Prepared(prepared)` | Commitments for an exact accepted signing unit are ready. Executor may sign only with matching retained direct-execution evidence, then collect peer signatures. |
 | Storage → `Committed(applied)` | The exact certified prefix and linked state/output/certificate/provenance are recoverably durable. `applied.checkpoint` is usable for Executor installation and covered Update ACKs. |
-| Storage → `Failed(failure)` | Identify the affected unit or storage instance and the error. No durable completion is implied. A mutable-store/durability failure stops that instance until recovery; invalid evidence leaves valid retained work pending. |
+| Storage → `Failed(failure)` | Identify the affected unit or storage instance and the error. No durable completion is implied. A mutable-store/durability failure stops that instance until recovery; a rejected commit request leaves valid retained work pending. |
+
+`commit` accepts a local verifier-produced value, never a peer `ExecutionCertificate` or caller-supplied verification flag. Storage checks the verified subject against its retained prepared root, material, exact order and current predecessor; a stale, missing or mismatched target cannot advance state. It retains an accepted request and original evidence through persistence. Exact retries are idempotent, including recovery of an already durable record; conflicting requests fail without authorizing a write. Executor remains the sole owner of quorum/signature verification, including on import and recovery.
 
 ### Cold state reads
 
@@ -178,17 +166,19 @@ A job reads its current in-memory writes first, then its completed in-memory par
 
 `ExecutedRange` binds exact continuous ordered inputs and output indices, predecessor state/prefix, runtime and accepted local execution provenance. A numeric high-water mark alone is insufficient. The App owner validates that this work matches its authoritative ordering and live attempt before submission. If Executor has speculated ABC but only AB is ordered, submit AB's retained changes and keep C in memory. Never include C merely because its computation finished.
 
-Assembly supplies Storage with read-only access to the App's authoritative retained ordering context; a peer certificate or caller-supplied frontier cannot replace it. Submission accepts one complete bounded signing unit; its agreed boundaries and changes representation must permit the chosen exact prefix. A later unit may depend on an earlier accepted, still-uncommitted unit. Storage retains that exact predecessor chain, prepares roots in order and defers canonical mutation until every required predecessor and certificate is valid. Executor can continue on its in-memory checkpoints without awaiting each storage commit. A conflicting or stale chain is rejected; overlapping retries do not double-apply changes. Exact duplicate submissions are idempotent; a replay after durable commit re-emits the matching completion.
+The direct canonical path synchronizes execution with Storage acceptance: the canonical worker awaits reuse/completion/repair of every block in the selected unit, then awaits `Storage::submit(executed, changes)`. It completes that handoff and advances to the next ordered unit only on `Ok(())`. Finishing computation or enqueueing an App-local forwarding task is insufficient. Pending or rejected submission retains the unit and retryable changes; no later unit overtakes it. A storage-instance failure requires recovery. This await does not wait for `Prepared`, `commit`, `Committed` or disk flush. Native callbacks, independent speculative work and retained Storage event intake remain serviceable; do not hold the App owner or a lock needed by Storage across the await.
+
+Assembly supplies Storage with read-only access to the App's authoritative retained ordering context; a peer certificate or caller-supplied frontier cannot replace it. Submission accepts one complete bounded signing unit; its agreed boundaries and changes representation must permit the chosen exact prefix. A later unit may depend on an earlier accepted, still-uncommitted unit. Storage retains that exact predecessor chain, prepares roots in order and defers canonical mutation until every required predecessor has an applicable Executor-verified commit request. Executor can continue on its in-memory checkpoints without awaiting each storage commit. A conflicting or stale chain is rejected; overlapping retries do not double-apply changes. Exact duplicate submissions are idempotent; a replay after durable commit re-emits the matching completion.
 
 Accepted changes are owned/retained by Storage, but acceptance may be memory-only. Before acceptance, cancellation or backpressure leaves the caller responsible for retryable changes. After acceptance, dropping a caller does not cancel retained work. On crash, only the recovered certified durable prefix is authoritative; replay/reexecution can reconstruct later accepted work. Executor may release a transferred changes buffer under the ownership contract, but keeps memory/checkpoint data still needed for reads, descendants or replay until durable installation and reference release.
 
-Storage prepares selected signing-unit commitments and emits `Prepared` before certification and application. App result processing gathers signatures and calls `certify`; certificate-only input cannot execute transactions or manufacture missing material. A verified peer import supplies matching material through Storage's existing import path and shares the same writer and `Committed` event. Imported work never generates an own direct-execution signature.
+Storage prepares selected signing-unit commitments and emits `Prepared` before certification and application. Executor binds the prepared state root and required output/material commitments to its direct execution, gathers signatures, verifies the full certificate and calls `commit(verified)`. Certificate-only input cannot execute transactions or manufacture missing material. A verified peer import supplies matching material through Storage's existing import path and shares the same writer and `Committed` event. Imported work never generates an own direct-execution signature.
 
 Storage chooses physical write/flush batching and may persist multiple successive certified units together. **Physical batching must not alter the deterministic operation history, signed roots, certification-unit boundaries or exact committed order.** Independently certified units retain their evidence and predecessor linkage. A longer-range certificate cannot be sliced to authorize an intermediate checkpoint. Batch thresholds need a bounded drain rule compatible with Marshal's delivery window, idle tails and shutdown; waiting for more Updates than the unacknowledged window allows would deadlock progress. Batch sizes and timing stay inside Storage.
 
-Track the distinct milestones: ordered, executed, submitted, certified and durable. Only `Committed` advances the published durable frontier and permits covered ACKs or checkpoint cleanup. Receiving `Prepared`, accepting a certificate, or completing a write without the required durability barrier does not. A certificate may arrive before material: bound pending evidence or reject it for retry, while valid direct work continues.
+Track the distinct milestones: ordered, executed, submitted, certified and durable. Only `Committed` advances the published durable frontier and permits covered ACKs or checkpoint cleanup. Receiving `Prepared`, accepting a certificate, or completing a write without the required durability barrier does not. A certificate may arrive before material: Executor bounds pending evidence or rejects it for retry while valid direct work continues; it requests commit only when Storage has retained the matching prepared material.
 
-Storage validates the full certificate subject, eligible epoch identities, distinct signatures, exact material and authoritative order; it rechecks the predecessor under writer authority before canonical mutation. Once mutation starts, task cancellation does not prove rollback. The retained operation must complete/reconcile or require recovery before another mutation. Recoverable state, outputs, applied identity, certificate evidence and provenance must agree. Recovery revalidates that linkage before emitting readiness; genesis uses the configured initial trust anchor.
+Executor validates the full certificate subject, eligible epoch identities, distinct signatures and authoritative order. Storage accepts only the resulting local `VerifiedCertificate`, matches its exact subject to retained material and ordering, and rechecks the predecessor under writer authority before canonical mutation. It does not collect signatures or repeat the quorum verifier. Once mutation starts, task cancellation does not prove rollback. The retained operation must complete/reconcile or require recovery before another mutation. Recoverable state, outputs, applied identity, certificate evidence and provenance must agree. Recovery loads the linked records and has Executor revalidate their original certificate and context before Storage publishes `Committed`; genesis uses the configured initial trust anchor.
 
 ### Event delivery and checkpoint installation
 
@@ -198,7 +188,7 @@ On `Committed(applied)`, the App owner publishes the applied identity, reliably 
 
 ### Checkpoint handoff and execution skipping
 
-`AppliedCheckpoint` contains the exact continuous certified ordered prefix, state/base/runtime identity, provenance and a usable pinned `StateView`. A height or root alone is insufficient. `DurableApplied` identifies the covered units and their recoverable evidence. Direct commit and certified import emit `StorageEvent::Committed`; startup recovery supplies the same established checkpoint through that retained handoff before dispatch. Assembly supplies the configured genesis checkpoint initially.
+`AppliedCheckpoint` contains the exact continuous certified ordered prefix, state/base/runtime identity, provenance and a usable pinned `StateView`. A height or root alone is insufficient. `DurableApplied` identifies the covered units and their recoverable evidence. Direct commit and certified import emit `StorageEvent::Committed`; startup recovery supplies the same established checkpoint after Executor verifies recovered evidence and Storage confirms the matching durable record, before dispatch. Assembly supplies the configured genesis checkpoint initially.
 
 `execution.install_checkpoint(checkpoint)` is a concrete Executor operation, not another public trait. The App owner retains the newest compatible checkpoint until it is adopted; dispatch uses that latest retained base. Installation checks exact identity and read access, then replaces the memory base and execution generation. Skip covered queued work, retire covered/conflicting attempts, and ignore their late completions. Preserve compatible descendants and rebase their remaining overlays without applying covered changes twice. Repeated exact checkpoints are idempotent, older compatible ones never rewind execution, and conflicting ones are rejected.
 
@@ -243,13 +233,14 @@ These are logical contracts, **not new Rust struct definitions or wire schemas**
 | `StateChanges` | Executor's sole state-data payload to Storage, accompanied by `ExecutedRange` metadata: deterministic application changes produced on the assigned parent. All data required as durable application effects by the chosen result contract must be represented here; concrete encoding remains open. No root, certificate, storage batch or Executor checkpoint. |
 | `ExecutedRange` | Exact bounded ordered unit, predecessor state/prefix, runtime and accepted direct-job identity; separately bound by the owner, never an unverified numeric frontier. |
 | `StateView` | Retained read-only capability for the exact installed base; Storage pins or fences its backing state for all reads. |
-| `StorageError`, `StorageFailure` | Distinguish rejected/backpressured submissions, unavailable reads, invalid evidence and fatal mutable-store/durability failure; include exact unit/instance scope for asynchronous failure. No error authorizes ACK. |
+| `StorageError`, `StorageFailure` | Distinguish rejected/backpressured submissions, unavailable reads, inapplicable commit requests and fatal mutable-store/durability failure; include exact unit/instance scope for asynchronous failure. No error authorizes ACK. |
 | `ExecutionOutcome` | Local job completion envelope containing `StateChanges` or failure/cancellation. App owns the job/context/provenance binding; the envelope is not another storage payload. |
 | `CanonicalInput` | Exact continuous input retained from one or more Updates. A bounded certification unit may span blocks; its whole authorized range is applied together. App retains every original ACK token. No prior candidate or verify call is required. |
 | `PreparedState`, `PreparedImport` | Selected commitments/material with full input/base/runtime/output identity, actual batch ancestry and direct/imported provenance. Preparation alone grants no writer authority. |
 | `DurableApplied`, `AppliedCheckpoint` | Durable completion carries a usable read-only canonical checkpoint with exact prefix/runtime/state identity, matching `f+1` evidence and provenance. Executor installs it to skip covered work. A root or QMDB flush alone is insufficient. |
 | `LeaderContext`, `FrozenReports`, `PreparedDirection` | Exact epoch/view/history/canonical parent/rule/window/frontier, original signed report snapshot, and a completed valid direction choice. No execution-completion or ordering-finality proof is implied. |
-| `VerifiedCertificate` | Matching execution statements with `f+1` distinct eligible signatures, independently checked against irrevocable exact input/base/runtime. It is neither a native ordering QC nor proof of local durability. |
+| `VerifiedCertificate` | Local Executor-verifier output binding original `f+1` evidence to the exact epoch, ordered input/range, predecessor state, runtime, state root and required output/material commitments. Construction is restricted to successful Executor verification; it is not a wire type or deserializable trusted flag. Storage persists the underlying evidence, not the local verification capability. It does not establish durability. |
+| `RecoveredState` | Storage-loaded state/checkpoint candidate plus exact applied identity, original certificate evidence and verification context. Executor must reverify it before usable checkpoint publication; loading disk bytes does not recreate `VerifiedCertificate`. |
 
 ## Existing interfaces to connect
 
@@ -297,9 +288,9 @@ PreCut uses admission, pending sorting and dispatch directly. Baton uses the sam
 | `execution.reconcile(input, canonical_base)` | App execution code → `StateChanges` | Reuse exact validated changes, finish or repair execution on the required parent. App canonical intake separately chooses a ready Storage import. Never substitute pending scheduler order for Marshal order. |
 | Storage preparation after `submit` | Storage internals → `StorageEvent::Prepared` | Materialize accepted StateChanges and prepare deterministic commitments for the exact unit; no larger speculative suffix or durability promise. |
 | `app.publish_applied(applied)` | App owner | Advance exact applied identity once, retain/forward `applied.checkpoint` to Executor and schedule pool reconciliation. ACK covered Updates after certified durability; checkpoint handoff adds no approval round. |
-| `state.recover(config)` | Storage assembly → retained `StorageEvent::Committed(recovered)` or recovery failure | Recover linked state/output/applied-position/certificate/provenance, establish the pinned view and emit `recovered: DurableApplied` to the App owner. The owner installs `recovered.checkpoint` before dispatch. Configured genesis uses its initial trust anchor. |
+| `state.recover(config)` | Storage assembly → `RecoveredState` or recovery failure | Load linked state/output/applied-position/certificate/provenance as a checkpoint candidate. Executor revalidates its certificate with `results.accept`; `Storage::commit(verified)` idempotently confirms the matching durable record and emits `Committed`. Only then install the checkpoint and dispatch. Configured genesis supplies its trusted initial checkpoint without an execution certificate. |
 
-The owner submits exact ordered changes through `Storage::submit`; result processing supplies evidence through `Storage::certify`. It handles `Prepared` and `Committed` events independently, without awaiting a flush inside execution. The ACK tokens stay with the retained delivery owner throughout these calls. `Storage` does not acknowledge Marshal directly. After a crash between App persistence and Marshal cursor persistence, replay verifies exact identity and recoverable certification evidence, then acknowledges idempotently. No new signature round is needed for a recovered certified applied record. Missing certification keeps input pending. The bounded signing unit must permit progress inside the delivery window; see the [canonical sequence](../03-e2e/06-ordered-application.md) and [certification units](../02-components/10-result-processing.md#certification-units-and-delivery-progress).
+The owner awaits exact ordered changes and `Storage::submit` acceptance as one canonical-worker operation; Executor supplies verified commit authority through `Storage::commit`. It handles `Prepared` and `Committed` events independently, without awaiting a flush inside execution. The ACK tokens stay with the retained delivery owner throughout these calls. `Storage` does not acknowledge Marshal directly. After a crash between App persistence and Marshal cursor persistence, replay verifies exact identity and recoverable certification evidence, then acknowledges idempotently. No new signature round is needed for a recovered certified applied record. Missing certification keeps input pending. The bounded signing unit must permit progress inside the delivery window; see the [canonical sequence](../03-e2e/06-ordered-application.md) and [certification units](../02-components/10-result-processing.md#certification-units-and-delivery-progress).
 
 ## Baton behavior and native extension
 
@@ -318,9 +309,9 @@ These four names describe obligations, not an approved hook API. Proposal encodi
 
 | Proposed call | Owner and return | Required contract |
 |---|---|---|
-| `results.sign(statement, direct_evidence)` | App execution/result code → attestation | Bind irrevocable exact input/base/runtime/result and verified direct execution. Imported work cannot become an own direct signature. |
-| `results.accept(evidence, canonical_context)` | App result code → `VerifiedCertificate`, pending or invalid | Verify full subjects and `f+1` distinct eligible signers independently of native ordering QC membership. Incomplete/missing context stays pending. |
-| `state.verify_material(certificate, material, base)` | App state code → `PreparedImport`, pending or invalid | Verify exact applicability and retain candidate material inside Storage, keyed by its full certified target, before returning PreparedImport. Later certify resolves that same retained material and rechecks the base under the shared writer. Neither return grants writer authority nor justifies stopping direct work. This concrete import helper is not a fourth method on the proposed public Storage trait. |
+| `results.sign(statement, direct_evidence)` | Executor result code → attestation | Bind irrevocable exact input/base/runtime/result and verified direct execution. Imported work cannot become an own direct signature. |
+| `results.accept(evidence, canonical_context)` | Executor result code → `VerifiedCertificate`, pending or invalid | Verify full subjects and `f+1` distinct eligible signers independently of native ordering QC membership. Incomplete/missing context stays pending. |
+| `state.verify_material(verified, material, base)` | App state code → `PreparedImport`, pending or invalid | Verify exact applicability and retain candidate material inside Storage, keyed by its full certified target, before returning PreparedImport. Later `Storage::commit(verified)` resolves that same retained material and rechecks the base under the shared writer. Neither return grants writer authority nor justifies stopping direct work. This concrete import helper is not a fourth method on the proposed public Storage trait. |
 | `app.open(config)` | App assembly → callback handles | Create retained Update/event ingress and wire dependencies before starting Marshal output. Storage recovery supplies the base separately; speculative lifecycle remains recovering. |
 | `app.start(mailbox.clone())` | App assembly → running callback work | Make custody lookup and Update handling usable before `Engine::open`; recovery verify must be answerable. |
 | `app.activate(native_ready, recovered_base)` | App owner → live speculative lifecycle | Activate only after successful native readiness and consistent App recovery; failed startup does not dispatch speculation. |
@@ -339,7 +330,7 @@ Follow [results](../03-e2e/07-result-certification.md), [state sync](../03-e2e/0
 | Optional native `Reporter<Activity>` | Correlate native observations | Best-effort hint |
 | Marshal `Reporter<Update>` | Retain canonical index, full block and ACK | Immediate local handoff |
 | Marshal ordered-input handoff | Retain complete Update and reflect exact continuous ordering in `Alignment::commit` | Ordering recorded without awaiting execution, certification or durability |
-| App canonical worker / Storage events | Submit ordered execution changes or verified import; Storage verifies `f+1` and batches durable application | `Committed` supplies a checkpoint to Executor and permits covered ACKs; Marshal cursor persistence is separate |
+| App canonical worker / Storage events | Submit ordered changes or verified import; Executor certifies the prepared result and requests Storage commit; Storage batches persistence | `Committed` supplies a checkpoint to Executor and permits covered ACKs; Marshal cursor persistence is separate |
 | Peer execution messages | Validate exact results and applicable state material | Result certification or safe import, independent of Baton reports |
 
 Existing cloneable handles and Commonware channels connect the App owner to asynchronous work. The completion contracts above explain each handoff without fixing private function names or adding a new public framework.

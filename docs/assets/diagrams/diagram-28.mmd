@@ -1,0 +1,7 @@
+flowchart TB
+    C["Valid usable candidate"] -->|"[P] Alignment::admit"| P["PreCutAlignment<br/>or BatonAlignment"]
+    O["Finalized ordering"] -->|"[P] Alignment::commit"| P
+    V["Current execution / resource view"] -->|"[P, internal] AlignmentPolicy::next"| P
+    P -->|"JobIntent or None"| A["App owner<br/>recheck and claim"]
+    A -->|"[A] execution.execute"| E["Exact-parent worker"]
+    B["Baton only<br/>reports / advisory direction"] -.->|"internal scheduling policy"| P

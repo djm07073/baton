@@ -20,18 +20,20 @@ sequenceDiagram
     E-->>A: StateChanges for selected canonical input
     A->>S: [P] Storage::submit(executed, changes)
     S-->>A: Ok(()), retained but not durable
-    Note over A,E: Executor continues from memory, Storage chooses flush timing
+    Note over A,E: Submit accepted: next ordered unit may proceed, Storage chooses flush timing
     S->>D: [C] new_batches().await or fork_batches(sealed_parent)
     D-->>S: Concrete unmerkleized batches owned by Storage
     S->>S: Materialize exact Executor effects under storage access fence
     S->>D: [C] concrete_batch.merkleize().await
     D-->>S: Sealed component batches / selected commitments
-    S-->>A: [P] StorageEvent::Prepared(prepared)
-    A->>A: [A] App result path obtains certificate evidence
+    S-->>E: [P] StorageEvent::Prepared(prepared), via App routing
+    E->>E: [A] results.sign(statement, direct_evidence)
+    Note over E: Exchange peer attestations for the same full subject
+    E->>E: [A] results.accept(evidence, canonical_context) -> verified or pending
 
-    A->>S: [P] Storage::certify(certificate)
-    S-->>A: Ok(()), admitted for verification, not durable
-    S->>S: Verify f+1, subject, material and predecessor, authorize whole prefix
+    E->>S: [P] Storage::commit(verified)
+    S-->>E: Ok(()), commit accepted, not durable
+    S->>S: Match verified subject, material and predecessor for the whole prefix
     alt Rejected before mutation
         S-->>A: [P] StorageEvent::Failed(failure), no ACK
     else Certificate, material and predecessor checks pass

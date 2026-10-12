@@ -1,0 +1,9 @@
+flowchart TB
+    A["A is running<br/>eligible C arrives, then B"] --> Q{"Has C started on A?"}
+    Q -->|"No"| P["F = A<br/>sort pending to B → C"]
+    P --> ABC["After exact parents complete<br/>execute A → B → C"]
+    Q -->|"Yes"| F["F = AC<br/>keep started order, B pending"]
+    F --> ACB["If ancestry permits<br/>execute A → C → B"]
+    O["Later authoritative Marshal order"] --> R["[A] execution.reconcile<br/>reuse exact prefix, repair suffix"]
+    ABC -.-> R
+    ACB -.-> R

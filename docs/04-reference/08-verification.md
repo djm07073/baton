@@ -2,6 +2,22 @@
 
 **Verify the App at its actual Multimmit/Marshal boundaries.** The cases below are acceptance criteria for future implementation, not executed Baton tests. Documentation source review, link checks and renders verify this design's presentation only.
 
+## What each verification stage must prove
+
+```mermaid
+flowchart TB
+    I["Adversarial tx / body / peer evidence"] --> C["Custody + callback checks<br/>valid verdict, bounded intake"]
+    C --> E["Execution checks<br/>exact parents, stale-work fencing"]
+    E --> S["Certification + storage checks<br/>f+1 subject, single writer, durable linkage"]
+    S --> R["Crash / replay / import checks<br/>no double apply, correct ACK frontier"]
+    O["Sequential oracle<br/>same order + base + runtime"] --> R
+    R --> B["Fair benchmark endpoints<br/>Original / PreCut / Baton"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-47.svg) · [PNG](../assets/diagrams/diagram-47.png)
+
+All proposed App runtime cases below remain **Not run**. Documentation rendering checks validate presentation and links, not these protocol properties.
+
 Use the deterministic Commonware runtime and simulated network with the same public Sender/Receiver interfaces as deployment. Construct real App callbacks and current Multimmit Marshal; native mock callbacks alone do not establish transaction/body/scheduler behavior. Reuse the current [Marshal integration fixtures](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/tests.rs) for assembly patterns.
 
 | Existing support | What it controls | App assertion still needed |
@@ -35,7 +51,9 @@ Inspect the current sync controls rather than copying an older API name. Observe
 | Execution / backend | Exact input-state/runtime ancestry; reuse only matching work; stale worker completion fenced; root preparation separate from effects; single canonical writer and crash-linked applied identity | Not run |
 | Cold reads | Current writes and parent overlays win; tombstone prevents fallback; pinned base remains stable during concurrent commit/import; missing/pruned view and I/O failure differ from absent key; old views retained until readers finish | Not run |
 | StateChanges handoff | Exact ordered range plus changes only; ABC speculation submits AB when only AB is ordered; duplicate/overlapping submissions never double-apply; accepted predecessor chains pipeline before durability; rejection/cancellation/backpressure retain retryable work | Not run |
-| Storage batching and events | Submission/certificate acceptance never ACKs or prunes memory; roots/signatures precede application; batched flush preserves each signed root/history; window saturation, idle tails and shutdown drain; retained Prepared/Committed/failure events avoid queue cycles; replay restores only recoverable durable prefix | Not run |
+| Synchronous execution-to-Storage handoff | Delay the last block's execution or `submit` acceptance: the canonical worker neither completes the handoff nor starts the next ordered unit; rejection retains retryable changes; after `Ok(())`, later units proceed while Prepared/certification/flush are delayed; callback and Storage event intake remain live | Not run |
+| Executor certification / Storage commit | Executor rejects duplicate/ineligible signers, fewer than f+1, mixed ranges/bases/runtimes/roots and imported own-signing; only verifier-produced values reach commit; Storage rejects stale or mismatched prepared material; recovery and imports reverify original evidence before checkpoint publication | Not run |
+| Storage batching and events | Submission/commit acceptance never ACKs or prunes memory; roots/signatures precede application; batched flush preserves each signed root/history; window saturation, idle tails and shutdown drain; retained Prepared/Committed/failure events avoid queue cycles; replay restores only recoverable durable prefix | Not run |
 | Checkpoint installation | Direct commit/import/recovery supply usable views; certified ABC skips local B/C; duplicates are idempotent; older checkpoints cannot rewind; conflicting contexts and stale completions rejected; compatible C/D descendants survive an AB commit while Executor is at ABCD; covered overlays freed only after reference/worker release; digest-only/unavailable material cannot skip; no Executor ACK gate | Not run |
 | Storage contract | Invalid/insufficient evidence and material mismatch cause no canonical mutation; duplicate signers never increase the threshold; stale base/conflicting order rejected; exact durable replay idempotent; future cancellation cannot bypass writer fencing; storage failure requires recovery; no ACK owned by trait | Not run |
 | Certification / state sync | `f+1` valid distinct same-statement signatures; direct/imported provenance; imported state never signed as local execution; state-sync floor/worker/Update coordination; scheduler cannot gate result/apply path | Not run |

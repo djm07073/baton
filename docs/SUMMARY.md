@@ -18,7 +18,7 @@
 * [Alignment: Pre-cut and Baton](02-components/07-alignment.md)
 * [Executor: execution and checkpoints](02-components/08-executor.md)
 * [Storage: reads and durable state](02-components/09-storage.md)
-* [Result processing: signing and certification](02-components/10-result-processing.md)
+* [Executor: result certification](02-components/10-result-processing.md)
 * [State sync: certified checkpoint handoff](02-components/11-state-sync.md)
 * [P2P: channels and messages](02-components/12-networking.md)
 

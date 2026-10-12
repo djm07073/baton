@@ -1,8 +1,24 @@
-# Result processing: signing and certification
+# Executor: result certification
 
 <a id="app-execution-and-result-certification"></a>
 
-**App result processing signs directly executed results and gathers matching peer evidence.** Executor supplies accepted computation evidence; Storage supplies prepared commitments. Result processing returns certificates to Storage, which independently verifies them before durable application. This is an App responsibility, not another required service or public trait.
+**Executor signs directly executed results, collects matching peer signatures and verifies `f+1` execution certificates.** Storage supplies the prepared state root and result commitments. After certification, Executor requests `Storage::commit(verified)` for persistence. Result processing is part of Executor, with no separate service or public trait.
+
+## What Executor certifies
+
+```mermaid
+flowchart TB
+    D["Own completed execution<br/>exact input + parent + runtime"] --> S["[A] results.sign<br/>full execution statement"]
+    R["[P] StorageEvent::Prepared<br/>state root + result commitments"] --> S
+    S --> P["wire: ExecutionAttestation<br/>peer exchange"]
+    P --> V["[A] results.accept<br/>distinct eligible signers + exact subject"]
+    V -->|"f+1 valid matching signatures"| C["[P] Storage::commit<br/>VerifiedCertificate"]
+    V -->|"Incomplete / invalid"| W["Pending / reject evidence<br/>no canonical apply or ACK"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-31.svg) · [PNG](../assets/diagrams/diagram-31.png)
+
+Certification belongs to Executor. A root alone is insufficient: signatures bind the same epoch, exact ordered range, canonical base, runtime and full result.
 
 ## Responsibilities
 
@@ -14,11 +30,11 @@
 
 | Direction | Call, event or value | Completion means |
 |---|---|---|
-| Executor → App result processing, through the owner | Accepted direct `ExecutionOutcome` and its exact job context | Local computation evidence; it still needs irrevocable input and prepared commitments before signing |
-| Storage → App result processing, through the owner | `StorageEvent::Prepared(prepared)` | Commitments/material for the selected unit; no canonical durability yet |
-| App result processing → peer Apps | `ExecutionAttestation(statement, signature)` | Own signature created locally for directly executed, fully bound work |
-| Peer Apps → App result processing | `ExecutionAttestation` or `ExecutionCertificate` | Local validation yields `VerifiedCertificate`, pending or invalid after full-subject and signer checks |
-| App result processing → Storage | `Storage::certify(certificate)` | Evidence accepted for verification; durable completion arrives separately as `StorageEvent::Committed` |
+| Executor computation → its result processing | Accepted direct `ExecutionOutcome` and its exact job context | Local computation evidence; it still needs irrevocable input and prepared commitments before signing |
+| Storage → Executor result processing, through the owner | `StorageEvent::Prepared(prepared)` | Commitments/material for the selected unit; no canonical durability yet |
+| Executor result processing → peer Apps | `ExecutionAttestation(statement, signature)` | Own signature created locally for directly executed, fully bound work |
+| Peer Apps → Executor result processing | `ExecutionAttestation` or `ExecutionCertificate` | Local validation yields `VerifiedCertificate`, pending or invalid after full-subject and signer checks |
+| Executor → Storage | `Storage::commit(verified)` | Locally verified result accepted for persistence; durable completion arrives separately as `StorageEvent::Committed` |
 
 `results.sign(statement, direct_evidence)` and `results.accept(evidence, canonical_context)` are local private helpers behind those exchanges. Peer messages are logical content with open codecs. See the [detailed result contract](../04-reference/01-communication-contracts.md#private-result-import-and-lifecycle-calls) and [message catalog](12-networking.md#messages-used-in-diagrams).
 
@@ -31,11 +47,13 @@ Execution and persistence use the [Executor](08-executor.md) and [Storage](09-st
 
 <a id="result-certification-inside-executor"></a>
 
-## Result certification inside App
+<a id="result-certification-inside-app"></a>
 
-App result-message handlers use existing authenticated P2P and crypto directly. Baton report/direction handling does not relay or gate execution certificates, state sync or apply.
+## Result certification inside Executor
 
-App retains the accepted Executor job's direct-computation evidence; Storage emits prepared commitments and serves durable material. Signing and peer collection remain App result handling. Importing a checkpoint can skip local execution, but never manufactures local execution evidence for that imported range.
+Executor result-message handlers use existing authenticated P2P and crypto directly. Baton report/direction handling does not relay or gate execution certificates, state sync or apply.
+
+App retains the accepted Executor job's direct-computation evidence; Storage emits prepared commitments and serves durable material. Signing, peer collection and full certificate verification belong to Executor. Importing a checkpoint can skip local execution, but never manufactures local execution evidence for that imported range.
 
 A direct signer requires its own completed execution/validation evidence, a prepared full result commitment, irrevocable exact input and the correct canonical input state. Bind epoch, range, exact ordered inputs, canonical base, runtime/rule and selected result/output/material commitments. Local worker generations and writer permits are not stable shared signature fields. Advisory speculative order alone does not satisfy the signing condition.
 
@@ -51,7 +69,7 @@ A certification unit is a bounded continuous ordered range with an exact start b
 
 Within a multi-block unit, compute successive blocks on private exact-parent checkpoints without awaiting per-block canonical application. Prepare and sign the unit's terminal result before the writer applies it; requiring application before signing would create a circular wait. Apply the whole certified unit and then ACK its covered Updates. A terminal certificate cannot be sliced to authorize an intermediate checkpoint unless the authenticated statement explicitly certifies that boundary. This permits bounded range signing without requiring per-block signatures.
 
-Persist the certificate, exact subject and required verification context with the recoverable applied record, or a durable reference whose evidence remains available. On restart, revalidate that linkage before publishing readiness or ACKing replay. Body custody and private work storage may persist earlier; they do not advance the certified canonical applied position. Result certification, canonical durability and Marshal's cursor durability remain distinct sequential conditions.
+Persist the certificate, exact subject and required verification context with the recoverable applied record, or a durable reference whose evidence remains available. On restart, Executor revalidates the recovered certificate and exact context; Storage confirms matching material and durable records before publishing readiness or ACKing replay. Body custody and private work storage may persist earlier; they do not advance the certified canonical applied position. Result certification, canonical durability and Marshal's cursor durability remain distinct sequential conditions.
 
 ## Reuse certificate building blocks
 

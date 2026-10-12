@@ -4,7 +4,19 @@ sequenceDiagram
     participant A as Alignment layer / App owner
     participant E as App Executor
     participant S as Storage
-    O->>S: [A] state.recover(config)
+    A->>S: [A] state.recover(config)
+    S-->>A: RecoveredState: checkpoint candidate and original evidence
+    alt Non-genesis recovered state
+        A->>E: [A] results.accept(recovered.evidence, recovered.context)
+        E-->>A: VerifiedCertificate or recovery failure
+        break Invalid or unresolved recovered evidence
+            Note over A,E: Stop startup, no Committed or ACK
+        end
+        E->>S: [P] Storage::commit(verified), confirm recovered durable record
+        S-->>E: Ok(()), matching record accepted
+    else Configured genesis
+        Note over A,S: Configured trusted initial state, no execution certificate
+    end
     S-->>A: [P] StorageEvent::Committed(recovered), exact prefix and pinned StateView
     A->>E: [A] execution.install_checkpoint(recovered.checkpoint)
     Note over A,E: Skip the recovered prefix, do not recreate its execution
@@ -23,12 +35,14 @@ sequenceDiagram
         E-->>A: StateChanges
         A->>S: [P] Storage::submit(executed, changes)
         S-->>A: Ok(()), retained but not durable
-        S-->>A: [P] StorageEvent::Prepared(prepared)
-        A->>A: [A] App result path obtains certificate evidence
-        Note over A,S: Missing certificate stays pending, no state apply or ACK
-        A->>S: [P] Storage::certify(certificate)
-        S-->>A: Ok(()), admitted for verification, not durable
-        S->>S: Verify f+1, subject, material and current base, apply durably
+        S-->>E: [P] StorageEvent::Prepared(prepared), via App routing
+        E->>E: [A] results.sign(statement, direct_evidence)
+        Note over E: Exchange peer attestations for the same full subject
+        E->>E: [A] results.accept(evidence, canonical_context) -> verified or pending
+        Note over E,S: Missing certificate stays pending, no state apply or ACK
+        E->>S: [P] Storage::commit(verified)
+        S-->>E: Ok(()), commit accepted, not durable
+        S->>S: Match verified subject, prepared material and current base, apply durably
         S-->>A: [P] StorageEvent::Committed(applied)
         A->>A: [A] app.publish_applied(applied)
         A->>E: [A] execution.install_checkpoint(applied.checkpoint)

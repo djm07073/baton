@@ -16,7 +16,7 @@
 
 The sections below expand each handler's ownership, waits and failure paths.
 
-The [interface map](../04-reference/01-communication-contracts.md) gives the shared call names, inputs/results and implementation owners used by the E2E Mermaid diagrams. The pseudocode here expands those contracts; it does not require an additional set of methods.
+The [interface map](../04-reference/01-communication-contracts.md) gives the shared call names, inputs/results and implementation owners used by the diagrams and pseudocode below. **[C]** marks an existing Commonware interface, **[P]** a proposed App trait, and **[A]** App-owned processing; these labels do not introduce additional methods.
 
 Cloned callback handles route to the same App state. For `propose` and `verify`, return the receiver promptly and run the pending request work shown below as bounded async jobs. Body/custody waits leave the App owner free to handle intake and completions; completed jobs re-enter that owner before updating shared state. The [existing example mailbox](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/examples/log-multimmit/src/application/mailbox.rs#L148) uses this handoff.
 
@@ -30,15 +30,18 @@ Keep failed startup, sibling-service lifetimes and shutdown under the [existing 
 
 ## Automaton::propose: pool to staged block
 
-```text
-on propose(context, digest_reply):
-    select a bounded batch from App's selected transaction candidates
-    build body and TransactionBlock::from_context(context, body)
-    await Marshal.stage_block(full_block) -> accepted custody handle
-    resolve digest_reply with full_block.header().body_digest()
-    // Native code next performs its local verify/custody check.
-    // Do not retire transactions merely because they were selected or proposed.
+```mermaid
+flowchart TB
+    P["[C] Automaton::propose(context)"] --> S["[A] pool.select<br/>retain stable bounded bytes"]
+    S --> B["[C] TransactionBlock::from_context"]
+    B --> M["[C] Marshal.stage_block<br/>await acceptance"]
+    M --> R["[C] digest_reply.send(body_digest)"]
+    R --> V["Native local verify / custody check<br/>before producer signing"]
 ```
+
+[Open full-size diagram](../assets/diagrams/diagram-49.svg) · [PNG](../assets/diagrams/diagram-49.png)
+
+Selection and proposal do not retire transactions; cleanup follows canonical durable outcomes.
 
 `stage_block(...).await` accepts custody work; the returned custody handle is the later durable-completion boundary. `put_block(...).await` combines staging and waiting. The native local `verify` must confirm validity and durable custody before local signing. If App promises durability earlier in its own propose implementation it may wait there, but selecting a batch or accepting staging alone is not a disk flush.
 
@@ -46,31 +49,50 @@ Transient absence of transactions or backpressure follows the callback's request
 
 ## Automaton::verify: validity, custody and scheduling
 
-```text
-on verify(context, body_digest, verdict_reply):
-    expected_header = context.header(body_digest)
-    reference = expected_header.block_ref() using App's configured hasher
-    locate/subscribe to the exact full block through Marshal using reference
-    // Start explicit fetch where needed, without awaiting subscription first.
-    await the required body; validate body digest, context and payload rules
-    if permanently invalid:
-        mark this candidate and dependent speculative eligibility unusable
-        resolve verdict_reply(false)
-        return
-    if temporary data/dependency is missing:
-        retain the live request and reply until data arrives or native cancels
-        return to the event loop
-    establish durable custody, unless the successful subscription already did so
-    on the App owner, recheck current applied position, lifecycle and eligibility
-    retain/deduplicate still-useful candidate metadata
-    if currently live, not already applied, and eligible for speculation:
-        update the selected scheduler's pending candidates
-        arrange a later dispatch when exact parent/resources are ready
-    resolve verdict_reply(true)
-    // No wait for transaction execution, result roots, reports or directions.
+The callback starts a bounded verification job and returns its receiver promptly. The job follows this flow; its waits leave the App event loop available.
+
+### Payload and custody
+
+```mermaid
+flowchart TB
+    V["[C] Automaton::verify<br/>context + body_digest"]
+    B["[C] Marshal block lookup / subscription<br/>get_block / subscribe_block<br/>fetch_block when needed"]
+    Q{"[A] Validation result"}
+    W["[A] Keep live request pending<br/>until data arrives or native cancels"]
+    I["[A] Invalidate candidate<br/>and dependent speculative eligibility<br/>[C] verdict_reply.send(false)"]
+    C["[C] Confirm durable custody<br/>successful subscribe_block<br/>or put_block / custody.wait"]
+    V -->|"Exact BlockRef"| B
+    B --> Q
+    Q -->|"Temporary data / dependency gap"| W
+    W -->|"Available and request still live"| B
+    Q -->|"Permanently invalid"| I
+    Q -->|"Valid"| C
 ```
 
-The actual `verify` future returns `oneshot::Receiver<bool>`; App later sends the verdict through the paired sender. `false` means permanent invalidity, not “body has not arrived,” “worker busy” or “speculation failed.” Keep temporary uncertainty pending. A successful `subscribe_block` already establishes durable custody; do not introduce a redundant second flush solely for scheduling. By contrast, `get_block` or `fetch_block` can return buffered material before its storage sync completes, so successful lookup/fetch alone cannot justify `true`. See [the body API guide](02-marshal-custody.md#use-marshals-existing-body-apis) for the fetch-first custody path and superseded subscription handling.
+[Open full-size diagram](../assets/diagrams/diagram-20.svg) · [PNG](../assets/diagrams/diagram-20.png)
+
+Derive the exact `BlockRef` from `context.header(body_digest)` using App's configured hasher. Check the body's digest, context and payload rules. Start an explicit fetch when needed **before waiting for the subscription to complete**. A successful subscription already establishes custody; lookup/fetch alone does not.
+
+### Candidate admission and verdict
+
+After validity and durable custody are confirmed, re-enter the App owner. Applied position or lifecycle may have changed while the job waited.
+
+```mermaid
+flowchart TB
+    O["[A] Recheck current App state<br/>retain / deduplicate useful candidates"]
+    L{"Eligible to speculate?"}
+    A["[P] Alignment::admit(candidate)<br/>[A] Wake later dispatch"]
+    T["[C] verdict_reply.send(true)"]
+    O --> L
+    L -->|"Live, unapplied and eligible"| A --> T
+    L -->|"No: skip speculation"| T
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-21.svg) · [PNG](../assets/diagrams/diagram-21.png)
+
+**`true` means valid payload and durable custody.** Admission only updates pending candidate state. [Later dispatch](#dispatch-after-verification) waits for the exact execution parent and resources; the verdict does not wait for transaction execution, result roots, reports or directions.
+
+The actual `verify` future returns `oneshot::Receiver<bool>`; App later sends the verdict through the paired sender. `false` means permanent invalidity, not “body has not arrived,” “worker busy” or “speculation failed.” A canceled request stops its pending job; custody failure cannot become `true`, and mutable-store failure requires recovery of that instance. See [the body API guide](02-marshal-custody.md#use-marshals-existing-body-apis) for the fetch-first custody path and superseded subscription handling.
 
 The shared Automaton documentation describes single-shot verification and terminal closure. Current Multimmit's remote chain plane has a narrower implementation exception: a closed receiver becomes `Unavailable`, eligibility returns to `Ready`, and verification can be dispatched again within the same run. Local uncanceled custody failure is fatal; recovery also requires `true`. Do not rely on closure as a portable retry mechanism, and deduplicate repeated live calls as well as recovery. [Remote dispatch](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/actors/voter/chain_plane.rs#L522), [eligibility transition](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/machine/eligibility.rs#L352).
 
@@ -82,21 +104,20 @@ Deduplicate candidates across concurrent verification, local proposal, activity 
 
 ### Dispatch after verification
 
-```text
-when a usable candidate or worker completion changes App state:
-    accept a completion only for the still-current execution attempt, once
-    reject cancelled, retired, duplicate or context-mismatched completion
-    preserve the valid completed/current local prefix F
-    sort only eligible pending candidates using G
-    if no valid execution parent checkpoint is ready:
-        leave dependent work pending
-    else if a worker slot is available:
-        recheck eligibility and choose the next pending block
-        bind the job to exact input state, runtime, ordered prefix and generation
-        on App owner, claim that pending job and reserve its resources
-        record the current attempt before launching it
-        start transaction computation on that parent
+```mermaid
+flowchart TB
+    W["Candidate / completion / capacity change"] --> A["[A] App owner accepts only<br/>current, unique completion"]
+    A --> N["[P, internal] AlignmentPolicy::next(view)<br/>preserve F, sort only eligible pending"]
+    N -->|"None"| P["Keep pending until state changes"]
+    N -->|"JobIntent"| C["[A] Recheck exact parent and eligibility<br/>claim attempt + resources before launch"]
+    C -->|"Claim fails"| P
+    C -->|"Claim succeeds"| E["[A] execution.execute(job)<br/>Commonware runtime worker"]
+    E -->|"ExecutionOutcome"| A
 ```
+
+[Open full-size diagram](../assets/diagrams/diagram-50.svg) · [PNG](../assets/diagrams/diagram-50.png)
+
+An unfinished parent or exhausted worker capacity keeps dependent work pending. Claims bind exact input state, runtime, ordered prefix and local attempt; scheduling selection alone starts no work.
 
 Computation runs through Commonware runtime workers, outside the native callback and App's short admission handlers. App retains the execution tree, completed effects and worker fences; the scheduler chooses pending work using that state. Claiming the job prevents another wakeup from starting the same attempt; distinct exact-parent repair work remains distinguishable. A failed launch or a current attempt ending without reusable output must settle its ownership once and re-evaluate work from the last valid checkpoint. Release claims/resources only after work never started or has safely terminated; dropping a waiter alone does not prove submitted CPU work stopped. Retain required canonical input for the chosen repair/recovery path. Correlate the current local attempt as well as exact input/parent/runtime: a matching generation alone does not make duplicate completion safe. The scheduler does not interpret the native producer header's `parent` as an application state root.
 
@@ -106,33 +127,27 @@ Marshal calls `Reporter::report` synchronously with an `Update` containing `inde
 
 The trusted local Marshal stream supplies the ordering authority; App checks its exact range against the recovered application checkpoint. Update is not a portable finality proof and does not carry execution state, runtime, result certificate or Baton policy. A peer-sent object with the same fields cannot substitute for this local callback. External evidence export remains a separate open contract, not a second verifier required for ordinary App delivery.
 
-```text
-report(update):
-    transfer the entire Update, including its Exact token, to App's retained inbox
-    reflect new continuous finalized ordering through Alignment::commit
-    return local Feedback immediately
-
-App canonical worker:
-    preserve the next continuous ordered unit and its exact ACK tokens
-    if recovered certified durable identity covers it, ACK replay idempotently
-    otherwise reuse/complete/repair its execution, or choose a verified peer import
-    forward exact executed range and StateChanges through Storage::submit
-    acceptance retains changes; continue execution without awaiting a flush
-    retain input on rejection, missing certification or storage failure
-
-on StorageEvent::Prepared:
-    App result handling signs direct work, collects evidence and calls Storage::certify
-
-on StorageEvent::Committed(applied):
-    reconcile the exact certified durable prefix with retained Updates
-    retain/forward applied.checkpoint so Executor skips covered input
-    refresh execution state and schedule pool maintenance from durable outcomes
-    acknowledge only the exact covered Updates
+```mermaid
+flowchart TB
+    U["[C] Reporter::report(Update)"] --> O["[A] Retain indexed block + Exact token<br/>[P] Alignment::commit(ordered)"]
+    O --> F["Return Feedback promptly"]
+    O --> C["[A] Canonical worker<br/>exact recovered replay, direct work or import"]
+    C -->|"direct work"| E["[A] execution.reconcile whole unit<br/>[P] await Storage::submit acceptance"]
+    E -->|"Ok: handoff complete"| N["Worker may take next ordered unit"]
+    E -->|"[P] Prepared + direct signing"| V["Executor verifies f+1<br/>[P] Storage::commit(verified)"]
+    C -->|"verified import"| V
+    V -->|"[P] Committed"| D["[A] app.publish_applied<br/>retain checkpoint, refresh state / pool"]
+    D --> A["[C] ACK exactly covered Updates"]
+    C -->|"exact certified durable replay"| A
 ```
+
+[Open full-size diagram](../assets/diagrams/diagram-51.svg) · [PNG](../assets/diagrams/diagram-51.png)
+
+Submission pending/rejection retains the unit and retryable changes. The worker advances only after Storage accepts; certification and flush proceed separately. The owner retains every ACK token, forwards the durable checkpoint to Executor and recovers on storage-instance failure.
 
 An Update may be App's first encounter with the block, including for an observer or skipped speculation. Canonical processing cannot require an earlier `verify` call or scheduler entry: it performs the application checks needed for execution, or reuses exact validated work. This does not add another Automaton callback.
 
-The public [`Storage`](../04-reference/01-communication-contracts.md#proposed-storage-interface) contract owns certificate verification and durable application. Executor supplies StateChanges with exact executed-range metadata; Storage prepares storage commitments and App result handling collects evidence. The retained Update owner forwards the `Committed` event's checkpoint to Executor and handles ACK. Storage submission can precede certification and durability; neither acceptance alone authorizes ACK. A call into this trait never waits for Alignment approval.
+The public [`Storage`](../04-reference/01-communication-contracts.md#proposed-storage-interface) contract owns root preparation and durable application authorized by Executor. Executor supplies StateChanges with exact executed-range metadata; Storage prepares storage commitments; Executor collects and verifies evidence before requesting commit. The retained Update owner forwards the `Committed` event's checkpoint to Executor and handles ACK. Storage submission can precede certification and durability; neither acceptance alone authorizes ACK. A call into this trait never waits for Alignment approval.
 
 Do not put application execution inside `report` or return an async future from it. App can pipeline receipt and computation while preserving canonical application order. Reports/direction planning cannot approve or gate this worker. App's capacity policy must also let required custody and canonical execution, root preparation and durability make progress under sustained optional load. Speculation, report verification and planning cannot indefinitely monopolize the resources that work needs.
 
@@ -140,7 +155,7 @@ Do not put application execution inside `report` or return an async future from 
 |---|---|---|
 | `report(Update)` returns | App accepted the delivery into its retained path | Native consensus and other delivery slots |
 | App finishes matching transaction work | A result exists for the exact execution context | Root preparation and result signing; canonical apply awaits certification |
-| App verifies matching `f+1` certificate | Exact ordered input/base/result is certified | Writer may apply matching material after its authority checks |
+| Executor verifies matching `f+1` certificate | Exact ordered input/base/result is certified | Writer may apply matching material after its authority checks |
 | App completes certified durable apply and ACKs | App can recover this applied input and certification evidence | Marshal releases acknowledged window capacity in contiguous order |
 | Marshal syncs its delivery cursor | Marshal can recover its acknowledged delivery position | Recovery from the persisted cursor and permitted pruning |
 

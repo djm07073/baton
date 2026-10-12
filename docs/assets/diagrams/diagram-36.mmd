@@ -1,0 +1,6 @@
+flowchart TB
+    A["App<br/>[C] propose + verify"] -->|"body digest + custody verdict"| P["Native producer<br/>signed lane header"]
+    P --> D["Native availability / DA"]
+    D --> L["Leader proposal<br/>native voting and finality"]
+    L -->|"[C] Reporter::report(Activity)"| M["Marshal<br/>history, bodies, canonical order"]
+    M -->|"[C] Reporter::report(Update)"| E["App canonical worker"]

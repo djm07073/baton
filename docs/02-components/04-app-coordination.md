@@ -4,7 +4,24 @@
 
 **App coordination connects native callbacks to the pool, Alignment, Executor, result processing and Storage.** It owns lifecycle, shared dispatch and retained Update tokens. Existing Multimmit Marshal supplies block custody, body exchange and ordered delivery.
 
-The name `App` below means the application being designed. Inside it, **Alignment layer** owns callback/delivery handling and scheduling; **App Executor** owns transaction computation and in-memory checkpoints; **Storage** owns persistent state, certification checks and checkpoint import/recovery. The pool remains a separate App responsibility. These are responsibility groups, not mandated processes. The native `AppExecutor` runs local `Automaton::propose/verify` jobs; it does not execute application transactions. See the [responsibility map](../04-reference/01-communication-contracts.md#consensus-alignment-and-app-executor).
+## One owner, independent work
+
+```mermaid
+flowchart TB
+    N["Multimmit"] -->|"[C] Automaton::propose / verify"| A["App owner<br/>retained inputs and lifecycle"]
+    M["Marshal"] <-->|"[C] report(Update) / ACK after durability"| A
+    A <-->|"[P] admit / commit<br/>[P, internal] next → JobIntent"| L["Alignment"]
+    A -->|"[A] claim, execute / reconcile"| E["Executor<br/>checkpoints + f+1 certification"]
+    E -->|"[P] read / submit / commit"| S["Storage"]
+    S -->|"[P] Prepared"| E
+    S -->|"[P] Committed"| A
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-26.svg) · [PNG](../assets/diagrams/diagram-26.png)
+
+The owner retains Update tokens and coordinates completions. Its short intake handlers stay available while body retrieval, transaction work and storage I/O run.
+
+The name `App` below means the application being designed. Inside it, **Alignment layer** owns callback/delivery handling and scheduling; **App Executor** owns transaction computation, in-memory checkpoints and result certification; **Storage** owns root preparation, persistent state and checkpoint material import/recovery. The pool remains a separate App responsibility. These are responsibility groups, not mandated processes. The native `AppExecutor` runs local `Automaton::propose/verify` jobs; it does not execute application transactions. See the [responsibility map](../04-reference/01-communication-contracts.md#consensus-alignment-and-app-executor).
 
 This design uses the current local Commonware checkout, [6233438](https://github.com/0xEyrie/monorepo/tree/6233438985d8249d2b2bc1204191d5d405652288). Earlier research against `534af0e` predates its Multimmit Marshal. Application scheduling, the transaction runtime and Baton policy integration described here remain to be implemented.
 
@@ -39,7 +56,7 @@ Pre-cut and Baton share the same execution, certification and storage path. Pre-
 | App → Alignment | `admit(candidate)`, `commit(ordered)` | Eligible candidate retained or finalized ordering reflected |
 | App dispatch → Alignment policy | Internal `AlignmentPolicy::next(view)` | `JobIntent` or `None`; the owner still claims the job |
 | App → Executor | `execution.execute/reconcile` | Exact-parent `ExecutionOutcome` / ordered StateChanges |
-| App → Storage | `Storage::submit/certify` | Work or evidence retained; events complete later stages |
+| App → Storage | `Storage::submit/commit` | Work or evidence retained; events complete later stages |
 | Storage → App → Executor | `StorageEvent::Committed(applied)`, then `execution.install_checkpoint` | Certified durable identity published and a usable execution base handed over |
 | App → Marshal | `update.acknowledgement.acknowledge()` | Matching delivery covered by certified durable App state |
 
@@ -79,7 +96,7 @@ The scheduler separates **candidate admission** from **dispatch**. A body can be
 
 Marshal reports continuous indexed blocks in its existing native order. App treats each `Update` as authoritative ordered input, reconciles the speculative path, and uses an exact matching completed result when available. Otherwise it finishes or repairs the required work. It then prepares/applies the selected state through the application's canonical writer.
 
-`Alignment::commit(ordered)` reflects the new finalized ordering as soon as the indexed input is retained. It waits for neither execution nor certification. Storage requires a matching verified `f+1` certificate before canonical application, then makes state, outputs, certificate evidence and applied identity recoverable. Only that certified durable completion releases the ACK token. Completed speculation can avoid rerunning transactions, but still needs certification. An ordering notification or queued block cannot authorize ACK.
+`Alignment::commit(ordered)` reflects the new finalized ordering as soon as the indexed input is retained. It waits for neither execution nor certification. Executor requests Storage commit only after verifying a matching `f+1` certificate. Storage then makes state, outputs, certificate evidence and applied identity recoverable. Only that certified durable completion releases the ACK token. Completed speculation can avoid rerunning transactions, but still needs certification. An ordering notification or queued block cannot authorize ACK.
 
 Marshal can deliver several blocks before earlier ACKs arrive, up to `max_pending_acks`. A full window holds further application delivery; the native consensus engine does not wait for these ACKs to vote or finalize. Marshal persists its own delivery cursor separately after acknowledged progress. App must handle redelivery after a crash between application durability and Marshal cursor durability. See [the complete Update/ACK flow](05-app-callbacks.md#marshal-reportupdate-canonical-input-and-ack).
 

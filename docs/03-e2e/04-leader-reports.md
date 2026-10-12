@@ -4,6 +4,23 @@
 
 **Baton is one scheduler mode inside the App.** It gathers signed intended orders and prepares advisory direction while native consensus proceeds. The sequences explain policy behavior and its interaction with consensus; private methods and worker decomposition are implementation choices.
 
+## Planning and cut proceed independently
+
+```mermaid
+flowchart TB
+    R["Valid intended-order reports"] --> S["Close snapshot once<br/>first 4f+1 or fixed deadline"]
+    S --> E["Finish bounded candidate evaluation<br/>2f+1 entire-prefix support, else sum-LCP"]
+    E --> D["Prepared advisory direction"]
+    C["Native cut opportunity"] --> Q{"Valid policy ready<br/>for actual context?"}
+    D -.->|"[X] authenticated adoption hook"| Q
+    Q -->|"Yes"| P["[X] Freeze and preserve policy<br/>in authenticated proposal"]
+    Q -->|"No, before adoption"| B["Use actual-parent valid base<br/>without waiting"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-37.svg) · [PNG](../assets/diagrams/diagram-37.png)
+
+The policy choice uses sum-LCP only with a nonempty frozen report snapshot. No reports or no completed valid candidate uses the base path before adoption; an adopted protected prefix cannot be discarded as fallback.
+
 Read after [Alignment policy](../02-components/07-alignment.md). This case follows report/direction messages and the explicitly unresolved native policy hooks through timing, completion and failure paths.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../04-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
@@ -13,6 +30,9 @@ Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned process
 External callers use `Alignment::admit/commit`; shared internal dispatch uses `AlignmentPolicy::next`. Report collection and direction selection below are behavior owned by `BatonAlignment`, not additional SDK methods to implement. The diagram does not prescribe private function names or separate planning workers.
 
 The report protocol below remains application work. Native leader-window context and authenticated proposal-policy adoption additionally require the [unfinished native extension](../04-reference/05-native-open-decisions.md). Producer `Automaton::propose` and `verify` are not leader-cut callbacks.
+
+<details>
+<summary>Detailed interface sequence</summary>
 
 ```mermaid
 sequenceDiagram
@@ -48,6 +68,8 @@ sequenceDiagram
 
 [Open full-size diagram](../assets/diagrams/diagram-06.svg)
 
+</details>
+
 A report is the fixed completed/current local prefix `F` followed by `sort_G(S_pending)`. It is an intention, not an execution proof. Equal context, `F`, rule and pending set produce equal intended order; equal total known inputs alone do not. Later arrivals do not change an already signed report or a closed snapshot.
 
 The leader counts at most `4f+1` distinct valid original reports. It closes on the first threshold/deadline event processed, without extending the deadline. With a nonempty snapshot and fully evaluated bounded admissible candidate set, select the longest nonempty entire prefix with at least `2f+1` original same-context supporters; if no such prefix exists, use raw sum-LCP. Before protected adoption, no reports or no prepared valid choice means the actual-parent valid native base path. Incomplete search does not establish a longest-prefix result.
@@ -57,6 +79,9 @@ The leader counts at most `4f+1` distinct valid original reports. It closes on t
 ## Planning completion versus proposal freeze
 
 This is the **required future integration flow**, not an API present in current Multimmit:
+
+<details>
+<summary>Detailed interface sequence</summary>
 
 ```mermaid
 sequenceDiagram
@@ -88,6 +113,8 @@ sequenceDiagram
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-12.svg)
+
+</details>
 
 Current `LeaderBlock` has no Baton policy field, and current Marshal uses the native order interpretation. Adding scheduling in `Automaton::verify` does not implement policy adoption, validator policy checks, exact leading-prefix preservation, continuation or recovery. The App cannot implement this by reordering finalized Updates after delivery.
 

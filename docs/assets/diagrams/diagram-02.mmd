@@ -45,13 +45,15 @@ sequenceDiagram
     E-->>A: StateChanges: reuse / finish / repair
     A->>S: [P] Storage::submit(executed, changes)
     S-->>A: Ok(()), retained but not durable
-    S-->>A: [P] StorageEvent::Prepared(prepared)
-    A->>A: [A] App result path obtains certificate evidence
+    S-->>E: [P] StorageEvent::Prepared(prepared), via App routing
+    E->>E: [A] results.sign(statement, direct_evidence)
+    Note over E: Exchange peer attestations for the same full subject
+    E->>E: [A] results.accept(evidence, canonical_context) -> verified or pending
 
     Note over A,S: Missing certification keeps work pending before state application
-    A->>S: [P] Storage::certify(certificate)
-    S-->>A: Ok(()), admitted for verification, not durable
-    S->>S: Verify f+1, subject, material and current base, apply durably
+    E->>S: [P] Storage::commit(verified)
+    S-->>E: Ok(()), commit accepted, not durable
+    S->>S: Match verified subject, prepared material and current base, apply durably
     S-->>A: [P] StorageEvent::Committed(applied)
     A->>A: [A] app.publish_applied(applied)
     A->>E: [A] execution.install_checkpoint(applied.checkpoint)

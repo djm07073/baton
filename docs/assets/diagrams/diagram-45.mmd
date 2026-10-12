@@ -1,0 +1,6 @@
+flowchart TB
+    E["Existing native Engine + Marshal"] --> A["App callbacks<br/>pool, local scheduling, execution"]
+    B["Baton prepared direction"] -.-> X["[X] Bind actual context and policy<br/>to authenticated leader proposal"]
+    X -.-> V["[X] Validate exact leading-prefix preservation"]
+    V -.-> R["[X] Preserve extension / view recovery<br/>and Marshal interpretation"]
+    R -.-> T["Protocol tests + safety / liveness evidence"]

@@ -1,0 +1,7 @@
+flowchart TB
+    K["Read key"] --> W{"Current writes / parent overlays?"}
+    W -->|"Value"| V["Return value"]
+    W -->|"Tombstone"| N["Return absent<br/>no older-state fallback"]
+    W -->|"Genuine miss"| S["[P] Storage::read(view, key)<br/>same pinned base for the job"]
+    S -->|"Some / None"| R["Return value / verified absence"]
+    S -->|"Unavailable view / I/O error"| E["Propagate failure<br/>never read a different base"]

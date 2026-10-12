@@ -1,0 +1,7 @@
+flowchart TB
+    D["Own completed execution<br/>exact input + parent + runtime"] --> S["[A] results.sign<br/>full execution statement"]
+    R["[P] StorageEvent::Prepared<br/>state root + result commitments"] --> S
+    S --> P["wire: ExecutionAttestation<br/>peer exchange"]
+    P --> V["[A] results.accept<br/>distinct eligible signers + exact subject"]
+    V -->|"f+1 valid matching signatures"| C["[P] Storage::commit<br/>VerifiedCertificate"]
+    V -->|"Incomplete / invalid"| W["Pending / reject evidence<br/>no canonical apply or ACK"]

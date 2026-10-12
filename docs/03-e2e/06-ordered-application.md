@@ -2,7 +2,23 @@
 
 <a id="finalized-order-and-canonical-state-application"></a>
 
-**Marshal delivers ordering; Alignment records it; Executor computes and Storage stores.** `Reporter<Update>::report` retains the Update, reflects new continuous order through `Alignment::commit(ordered)` and returns promptly. The separate [`Storage`](../04-reference/01-communication-contracts.md#proposed-storage-interface) accepts ordered changes, validates matching `f+1` evidence and batches persistence. The Update owner sends ACK after `StorageEvent::Committed`, independently of earlier submission acceptance.
+**Marshal delivers ordering; Alignment records it; Executor computes and Storage stores.** `Reporter<Update>::report` retains the Update, reflects new continuous order through `Alignment::commit(ordered)` and returns promptly. The separate [`Storage`](../04-reference/01-communication-contracts.md#proposed-storage-interface) accepts ordered changes, accepts Executor-verified commit requests and batches persistence. The Update owner sends ACK after `StorageEvent::Committed`, independently of earlier submission acceptance.
+
+## Ordering to ACK at a glance
+
+```mermaid
+flowchart TB
+    U["[C] report(Update)<br/>retain block + Exact token"] --> O["[P] Alignment::commit<br/>record ordering promptly"]
+    O --> E["[A] execution.reconcile<br/>reuse / complete / repair unit"]
+    E --> S["[P] Storage::submit<br/>await acceptance"]
+    S -->|"Ok"| N["Worker may take next ordered unit"]
+    S -->|"[P] Prepared"| C["Executor verifies f+1<br/>[P] Storage::commit"]
+    C -->|"[P] Committed after durability"| A["Install checkpoint<br/>ACK exactly covered Updates"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-39.svg) · [PNG](../assets/diagrams/diagram-39.png)
+
+This is the direct path. Verified import and recovered durable replay use the same certified checkpoint/ACK boundary; a pending or rejected submission retains the current unit.
 
 <a id="cut-commit--ordered-range--execution-commit"></a>
 
@@ -11,6 +27,9 @@ Read after [Marshal delivery](../02-components/03-marshal-delivery.md), [Executo
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../04-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
 
 ## Native finality → ordered delivery → durable App application
+
+<details>
+<summary>Detailed interface sequence</summary>
 
 ```mermaid
 sequenceDiagram
@@ -35,16 +54,18 @@ sequenceDiagram
         E-->>A: StateChanges: reuse / finish / repair
         A->>S: [P] Storage::submit(executed, changes)
         S-->>A: Ok(()), retained but not durable
-        S-->>A: [P] StorageEvent::Prepared(prepared)
-        A->>A: [A] App result path obtains certificate evidence
+        S-->>E: [P] StorageEvent::Prepared(prepared), via App routing
+        E->>E: [A] results.sign(statement, direct_evidence)
+        Note over E: Exchange peer attestations for the same full subject
+        E->>E: [A] results.accept(evidence, canonical_context) -> verified or pending
 
         alt Certificate unavailable
             Note over A,S: Keep prepared work, no canonical state apply or ACK
         else Certificate and prepared material available
-            A->>S: [P] Storage::certify(certificate)
-            S-->>A: Ok(()), admitted for verification, not durable
+            E->>S: [P] Storage::commit(verified)
+            S-->>E: Ok(()), commit accepted, not durable
             S-->>A: [P] StorageEvent::Committed(applied) or StorageEvent::Failed(failure)
-            Note over A,S: Verify f+1, subject, material and predecessor, failure has no ACK
+            Note over E,S: Executor verified f+1, Storage matches material and predecessor, failure has no ACK
             opt Durable success
                 A->>A: [A] app.publish_applied(applied)
                 A->>E: [A] execution.install_checkpoint(applied.checkpoint)
@@ -61,13 +82,17 @@ sequenceDiagram
 
 [Open full-size diagram](../assets/diagrams/diagram-08.svg)
 
+</details>
+
 `Update` contains `index`, the complete `Arc<TransactionBlock>`, and `Exact` acknowledgement. The App must preserve the indexed sequence; pending speculative priority must not reorder it. Marshal already owns ordinary native history interpretation, missing-block backfill, finalized output retention and delivery. Baton does not duplicate those mechanisms. [Update contract](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/types.rs#L128)
 
 An Update may be App's first encounter with a block, as for an Observer or skipped speculation. Canonical reconciliation needs no earlier verify or candidate entry: execute with the required application checks, reuse exact validated work, or use verified applicable imported material. State-dependent transaction outcomes do not change native order.
 
-The App owns the effect-to-state contract. `Alignment::commit` reflects ordering even while execution, signatures or storage are pending. Ordering and applied-state frontiers remain separate. Storage owns certificate validation and the writer; Alignment has no `f+1` collection or state-commit approval role. A repeated index is safe to ACK only after checking exact block identity, certified durable state and retained certificate linkage. A gap, conflict or mismatched predecessor stops advancement. Recovery may redeliver after application persistence but before Marshal's cursor persistence.
+The App owns the effect-to-state contract. `Alignment::commit` reflects ordering even while execution, signatures or storage are pending. Ordering and applied-state frontiers remain separate. Executor owns certificate validation; Storage owns the writer; Alignment has no `f+1` collection or state-commit approval role. A repeated index is safe to ACK only after checking exact block identity, certified durable state and retained certificate linkage. A gap, conflict or mismatched predecessor stops advancement. Recovery may redeliver after application persistence but before Marshal's cursor persistence.
 
 The execution path may collect several continuous Updates into one bounded certification unit. Keep every original token; compute its internal blocks on private checkpoints, verify its terminal certificate, apply the whole authorized unit, then ACK covered Updates. The unit must fit the active delivery window and cannot rely on its own ACK to receive inputs needed for certification. A terminal certificate alone does not authorize intermediate checkpoint publication. The diagram shows the unit's processing once sufficient input is retained.
+
+On the direct path, `execution.reconcile` completion and the `Storage::submit` request/`Ok(())` response form one sequential canonical-worker operation. Await all execution for the unit and Storage's acceptance before completing this handoff or starting the next ordered unit. A pending or rejected submission holds that position and retains retryable changes. Root preparation, certification and durability proceed through the later events; the worker does not wait for them before the next submission. `report(Update)` still returns promptly, and the App must keep draining Storage events while submission waits.
 
 ## What the ACK waits for
 
@@ -80,6 +105,9 @@ Within one active delivery window, Marshal can report multiple Updates while ear
 `report` is a synchronous retained handoff: preserve every accepted Update and its Exact token in App state, using coalesced wakeups if needed. `Backoff` does not request redelivery, and an unacknowledged dropped Exact clone cancels completion. The [canonical callback contract](../02-components/05-app-callbacks.md#marshal-reportupdate-canonical-input-and-ack) defines active-window sizing, clone obligations, crash replay and App-owned floor/import coordination; floor resets do not clear App's retained Updates.
 
 ## Execution lifecycle: QMDB branches and canonical promotion
+
+<details>
+<summary>Detailed interface sequence</summary>
 
 ```mermaid
 sequenceDiagram
@@ -104,18 +132,20 @@ sequenceDiagram
     E-->>A: StateChanges for selected canonical input
     A->>S: [P] Storage::submit(executed, changes)
     S-->>A: Ok(()), retained but not durable
-    Note over A,E: Executor continues from memory, Storage chooses flush timing
+    Note over A,E: Submit accepted: next ordered unit may proceed, Storage chooses flush timing
     S->>D: [C] new_batches().await or fork_batches(sealed_parent)
     D-->>S: Concrete unmerkleized batches owned by Storage
     S->>S: Materialize exact Executor effects under storage access fence
     S->>D: [C] concrete_batch.merkleize().await
     D-->>S: Sealed component batches / selected commitments
-    S-->>A: [P] StorageEvent::Prepared(prepared)
-    A->>A: [A] App result path obtains certificate evidence
+    S-->>E: [P] StorageEvent::Prepared(prepared), via App routing
+    E->>E: [A] results.sign(statement, direct_evidence)
+    Note over E: Exchange peer attestations for the same full subject
+    E->>E: [A] results.accept(evidence, canonical_context) -> verified or pending
 
-    A->>S: [P] Storage::certify(certificate)
-    S-->>A: Ok(()), admitted for verification, not durable
-    S->>S: Verify f+1, subject, material and predecessor, authorize whole prefix
+    E->>S: [P] Storage::commit(verified)
+    S-->>E: Ok(()), commit accepted, not durable
+    S->>S: Match verified subject, material and predecessor for the whole prefix
     alt Rejected before mutation
         S-->>A: [P] StorageEvent::Failed(failure), no ACK
     else Certificate, material and predecessor checks pass
@@ -137,4 +167,6 @@ sequenceDiagram
 
 [Open full-size diagram](../assets/diagrams/diagram-09.svg)
 
-Alignment, execution workers and storage are internal App responsibilities. Separate execution effects from root preparation, preserve exact parent/context reuse, and use one canonical writer for direct execution and peer import. The proposed Storage trait defines reads, submissions, certificate intake and events; concrete execution calls need no additional public Executor trait or delivery actor. QMDB APIs and the remaining root-deferred branching work are described in [QMDB](../04-reference/03-qmdb.md). No unconditional atomicity across independently stored state, outputs and applied metadata is implied.
+</details>
+
+Alignment, execution workers and storage are internal App responsibilities. Separate execution effects from root preparation, preserve exact parent/context reuse, and use one canonical writer for direct execution and peer import. The proposed Storage trait defines reads, submissions, verified commit requests and events; concrete execution calls need no additional public Executor trait or delivery actor. QMDB APIs and the remaining root-deferred branching work are described in [QMDB](../04-reference/03-qmdb.md). No unconditional atomicity across independently stored state, outputs and applied metadata is implied.

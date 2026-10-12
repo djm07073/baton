@@ -2,6 +2,20 @@
 
 **Read [01. Architecture](01-overview/01-architecture.md) first.** It shows how one App connects to the existing Multimmit Engine and Marshal, and where TxPool, Alignment, Executor and Storage fit inside App.
 
+## Choose a reading path
+
+```mermaid
+flowchart LR
+    A["01 · Overview<br/>Who owns what?"] --> B["02 · Components<br/>What crosses each interface?"]
+    B --> C["03 · E2E<br/>What happens next?"]
+    B -.-> D["04 · Reference<br/>Exact contracts and open work"]
+    C -.-> D
+```
+
+[Open full-size diagram](assets/diagrams/diagram-22.svg) · [PNG](assets/diagrams/diagram-22.png)
+
+Start with the picture on each page. E2E pages show a short path first; expand their detailed sequences when you need exact calls and failure handling. **[C]** is existing Commonware, **[P]** a proposed App contract, **[A]** App processing, and **[X]** unfinished native work. Value/ownership maps describe data relationships rather than new interfaces.
+
 ## Reading order
 
 The folders and filenames are numbered in reading order. Follow `01-overview`, then `02-components`, then `03-e2e`. Keep `04-reference` nearby for details when needed.
@@ -11,7 +25,7 @@ The folders and filenames are numbered in reading order. Follow `01-overview`, t
 3. **`03-e2e/` — follow the complete flow.** Start with [Transaction to durable state](03-e2e/01-transaction-to-state.md). Files `02`–`09` expand individual paths and recovery.
 4. **`04-reference/` — look up details as needed.** Consult [communication contracts](04-reference/01-communication-contracts.md), Rust signatures, backend research and development checks from the component and E2E links.
 
-Within the component section, the order is **Multimmit → Marshal → App coordination and callbacks → TxPool → Alignment → Executor → Storage → result processing → state sync → P2P**. Once these responsibilities and exchanges are clear, continue to the first E2E page. Detailed type declarations can wait until you need them.
+Within the component section, the order is **Multimmit → Marshal → App coordination and callbacks → TxPool → Alignment → Executor → Storage → Executor result certification → state sync → P2P**. Once these responsibilities and exchanges are clear, continue to the first E2E page. Detailed type declarations can wait until you need them.
 
 The [full contents](SUMMARY.md), filenames and site's previous/next links use this same order. `assets/` contains diagram renders and the generated Rust export; it is not a reading chapter.
 
@@ -20,7 +34,7 @@ The [full contents](SUMMARY.md), filenames and site's previous/next links use th
 Keep three completion boundaries in mind:
 
 - `verify(true)` establishes payload validity and custody; eligible execution is dispatched independently.
-- `Alignment::commit(ordered)` records finalized ordering immediately. `Storage::submit` and `certify` success mean accepted work or evidence.
+- `Alignment::commit(ordered)` records finalized ordering immediately. `Storage::submit` accepts executed changes; `Storage::commit` accepts an Executor-verified request for persistence.
 - `StorageEvent::Committed(applied)` establishes certified local durability, supplies Executor's next usable checkpoint and permits ACK of the covered Updates. Executor installation adds no ACK round.
 
 ## Document status

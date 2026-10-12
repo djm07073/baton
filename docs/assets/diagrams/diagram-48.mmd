@@ -1,0 +1,6 @@
+flowchart TB
+    U["Current user decisions"] --> D["docs/<br/>current App design"]
+    N["Native source pin 6233438<br/>existing Engine / Marshal behavior"] --> D
+    H["Paper + historical reviews<br/>motivation and prior investigations"] -.->|"context, preserve original scope"| D
+    D --> S["Generated site + diagram assets"]
+    R["Rust reference page"] --> X["Generated existing-API excerpts"]

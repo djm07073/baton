@@ -1,0 +1,6 @@
+flowchart TB
+    P["[C] Automaton::propose(context)"] --> S["[A] pool.select<br/>retain stable bounded bytes"]
+    S --> B["[C] TransactionBlock::from_context"]
+    B --> M["[C] Marshal.stage_block<br/>await acceptance"]
+    M --> R["[C] digest_reply.send(body_digest)"]
+    R --> V["Native local verify / custody check<br/>before producer signing"]

@@ -1,0 +1,20 @@
+flowchart LR
+    subgraph L["Node A"]
+        N1["Multimmit"]
+        M1["Marshal"]
+        P1["App TxPool"]
+        B1["Baton Alignment"]
+        E1["Executor"]
+    end
+    subgraph R["Node B"]
+        N2["Multimmit"]
+        M2["Marshal"]
+        P2["App TxPool"]
+        B2["Baton Alignment"]
+        E2["Executor / state import"]
+    end
+    N1 <-->|"native headers / DA / proposals / proofs"| N2
+    M1 <-->|"full blocks / backfill"| M2
+    P1 <-->|"transactions"| P2
+    B1 <-->|"reports / advisory direction"| B2
+    E1 <-->|"attestations / certificates / material"| E2

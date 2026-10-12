@@ -4,9 +4,38 @@
 
 **Reuse one Commonware network and the existing Multimmit/Marshal channels.** App transaction, report/direction and execution-result messages can use additional logical channels on that network. They need no second networking stack.
 
+## Separate message planes
+
+```mermaid
+flowchart LR
+    subgraph L["Node A"]
+        N1["Multimmit"]
+        M1["Marshal"]
+        P1["App TxPool"]
+        B1["Baton Alignment"]
+        E1["Executor"]
+    end
+    subgraph R["Node B"]
+        N2["Multimmit"]
+        M2["Marshal"]
+        P2["App TxPool"]
+        B2["Baton Alignment"]
+        E2["Executor / state import"]
+    end
+    N1 <-->|"native headers / DA / proposals / proofs"| N2
+    M1 <-->|"full blocks / backfill"| M2
+    P1 <-->|"transactions"| P2
+    B1 <-->|"reports / advisory direction"| B2
+    E1 <-->|"attestations / certificates / material"| E2
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-33.svg) · [PNG](../assets/diagrams/diagram-33.png)
+
+These are logical message owners; concrete App wire codecs and channel allocation remain open. Existing Commonware Sender/Receiver handles carry the traffic.
+
 ## Responsibility and communication
 
-Commonware transport supplies authenticated peer connections and registered channels. Multimmit and Marshal own native message handling; App ingress, Baton policy and result processing validate their own message content. Transport receipt establishes neither transaction admission, final ordering nor certified durability.
+Commonware transport supplies authenticated peer connections and registered channels. Multimmit and Marshal own native message handling; App ingress, Baton policy and Executor result processing validate their own message content. Transport receipt establishes neither transaction admission, final ordering nor certified durability.
 
 ## P2P connections and message planes
 
@@ -57,7 +86,7 @@ Bound complete encoded messages and outstanding requests/subscriptions, not only
 | `SignedReport(context, intended_order)` | Original authenticated intended-order report, counted once per eligible identity in the fixed window; not execution evidence. |
 | `SignedDirection(context, order)` | Authenticated advisory direction under the same context; [pending-order rules](../03-e2e/05-direction-and-execution.md) constrain adoption. It does not establish native finality. |
 | `ExecutionAttestation(statement, signature)` | Original eligible validator signature over the exact direct-execution subject under [result certification](10-result-processing.md#result-certification-inside-executor). |
-| `ExecutionCertificate(statement, signatures)` | Matching full subject and distinct eligible `f+1` evidence; Storage verifies it independently before state application. |
+| `ExecutionCertificate(statement, signatures)` | Matching full subject and distinct eligible `f+1` evidence; Executor verifies it before requesting Storage commit. |
 | `MaterialRequest(verified_target)` / `StateMaterial(target, data, outputs)` | Request and applicable state/output material bound to the same certified target under [state sync](11-state-sync.md); a certificate alone is not material. |
 | `TransactionBlock` / `SignedTransactionBlock` | Existing complete block / signed producer-header artifacts; [body exchange](02-marshal-custody.md) explains their independent paths. |
 | DA vote/certificate, `LeaderBlock`, native votes and proof artifacts | Existing [native protocol messages](01-multimmit.md), not App execution-result certificates. Future policy encoding in diagram 12 remains an unresolved native extension. |

@@ -17,13 +17,17 @@ flowchart TB
     subgraph A["PreCut inside App"]
         I["Alignment layer callback handles"] -->|"[A] pool.select / pool.reconcile"| T["App pool"]
         I <-->|"[P] Alignment::admit / commit<br/>AlignmentPolicy::next (internal)"| Q["PreCutAlignment"]
-        I <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges"| E["App Executor: workers and checkpoints"]
-        I <-->|"[P] Storage::submit / certify<br/>StorageEvent::Prepared / Committed"| S["Storage<br/>reads, f+1 and persistence"]
+        I <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges"| E["App Executor: execution, checkpoints, f+1"]
+        I -->|"[P] Storage::submit(executed, changes)"| S["Storage<br/>reads, roots and persistence"]
+        S -->|"[P] StorageEvent::Prepared"| E
+        E -->|"[P] Storage::commit(verified)"| S
+        S -->|"[P] StorageEvent::Committed"| I
         I -->|"[A] execution.install_checkpoint"| E
         E <-->|"[P] Storage::read(view, key)<br/>cold state at pinned base"| S
     end
     I <-->|"[C] custody / ACK to Marshal<br/>report(Update) to App"| M
-    I <--->|"wire: execution evidence / state material"| P["Peer Apps"]
+    E <--->|"wire: execution evidence"| P["Peer Apps"]
+    S <--->|"wire: state material"| P
     classDef reuse fill:#dbeafe,stroke:#2563eb,color:#172554;
     classDef fresh fill:#dcfce7,stroke:#16a34a,color:#14532d;
     class N,M reuse;
@@ -39,10 +43,10 @@ flowchart TB
 | Existing Multimmit Marshal | Durable body custody, relay, native proof/history verification, backfill, ordinary dense order and recoverable delivery cursor |
 | App PreCut scheduler | Candidate deduplication, pending-only global ordering and dispatch with exact execution parents |
 | App Executor | In-memory computation and checkpoints, branch reuse/repair; StateChanges are its sole state-data payload, paired with exact ordered-range metadata |
-| Storage | Selected roots, writer/fencing, certificate verification, durable apply, state import/recovery and usable checkpoint handoff |
-| App result processing | Sign accepted direct results and exchange execution evidence/material with peers |
+| Storage | Selected roots, writer/fencing, material matching, durable apply, state import/recovery and usable checkpoint handoff |
+| Executor result processing | Sign direct results, exchange peer evidence, verify f+1 and request Storage commit |
 
-`PreCutAlignment` implements public `Alignment` (`admit`, `commit`) and crate-internal `AlignmentPolicy` (`next`). The internal dispatch loop shares the latter contract with Baton. Both modes use public `Storage::read/submit/certify` and its retained events. Executor reads cold values at a pinned base and submits exact ordered changes without awaiting durability. `Committed` supplies a checkpoint to skip covered input and retire memory safely; import and recovery use the same handoff. Existing Marshal already implements the ordinary ordering/custody/delivery machinery that earlier drafts assigned to a new baseline attachment. The app implements transaction semantics and scheduling through concrete internal code.
+`PreCutAlignment` implements public `Alignment` (`admit`, `commit`) and crate-internal `AlignmentPolicy` (`next`). The internal dispatch loop shares the latter contract with Baton. Both modes use public `Storage::read/submit/commit` and its retained events. Executor reads cold values at a pinned base and submits exact ordered changes without awaiting durability. `Committed` supplies a checkpoint to skip covered input and retire memory safely; import and recovery use the same handoff. Existing Marshal already implements the ordinary ordering/custody/delivery machinery that earlier drafts assigned to a new baseline attachment. The app implements transaction semantics and scheduling through concrete internal code.
 
 ## Inputs and Rust connection points
 
@@ -55,36 +59,21 @@ flowchart TB
 
 Live verify-based intake applies to validators, including nonproducing validators. `Role::Observer` has no live per-chain validation planes; it executes canonical Updates unless an explicit authenticated early-candidate intake is added. `verify` also runs for local pre-sign custody and startup recovery. A callback is not automatically another-lane packet arrival. Qualify lifecycle, lane, exact authenticated context/reference, duplicate state and applied position before admitting a candidate. Header and body arrival order can differ. Preserve native authentication and body validation; no DA-certificate barrier is added merely for speculation. [Callback contract](../02-components/05-app-callbacks.md).
 
-```text
-app handles successful verification:
-    establish valid body and durable custody
-    on App owner, refresh exact candidate facts
-    if live, eligible and not already applied or claimed:
-        admit candidate to PreCut pending work once
-    reply true without awaiting speculative execution
-
-PreCut dispatch:
-    preserve completed/current path F
-    sort only eligible unstarted pending work by G
-    with valid exact predecessor and available worker capacity:
-        on App owner, claim pending work and record its current attempt before launch
-        launch transaction computation from that predecessor
-
-app handles Marshal Update:
-    retain Update and return promptly from report
-    notify Alignment::commit of new continuous finalized order without waiting
-    consume index in canonical order
-    if this exact index/block has recovered certified durable application:
-        ACK redelivery and return without applying again
-    gather the next bounded certification unit within the delivery window
-    reuse matching work or complete/repair using its private exact-parent checkpoints
-    prepare the result and verify f+1 distinct matching result signatures
-    if certification is missing or mismatched: keep work pending without state apply or ACK
-    recheck certificate, material, predecessor and writer authority before mutation
-    apply the authorized unit with recoverable identity, outputs and certificate evidence
-    on App owner, publish the matching durable canonical advance once
-    ACK after durable application
+```mermaid
+flowchart TB
+    V["[C] verify succeeds<br/>valid payload + durable custody"] --> A["[P] Alignment::admit<br/>eligible live candidate only"]
+    A --> N["[P, internal] AlignmentPolicy::next<br/>F + sorted pending"]
+    N --> E["[A] Owner claims resources<br/>execution.execute on exact parent"]
+    U["[C] report(Update)<br/>retain block + ACK token"] --> O["[P] Alignment::commit<br/>record finalized order"]
+    O --> R["[A] Canonical reconcile<br/>reuse exact work or repair suffix"]
+    E -.->|"compatible effects"| R
+    R --> S["[P] submit → Prepared<br/>Executor f+1 → Storage::commit"]
+    S -->|"[P] Committed"| D["Install checkpoint<br/>ACK covered Updates"]
 ```
+
+[Open full-size diagram](../assets/diagrams/diagram-53.svg) · [PNG](../assets/diagrams/diagram-53.png)
+
+Intake records ordering and returns Feedback promptly; canonical work runs independently. An exact recovered durable identity ACKs replay without applying twice. Missing certification stays pending; current material, predecessor and writer authority must match before mutation. This path has no Baton reports or direction messages.
 
 These are app-handler steps, not new public methods. The actual Rust signatures and typed callback-handle composition are in [Rust interfaces](02-rust-signatures.md). Temporary body/dependency loss keeps verify pending; speculative capacity cannot make valid content permanently invalid. An unavailable speculative opportunity does not remove later canonical work from the Update path.
 
@@ -107,7 +96,7 @@ A producer-header parent is not an execution predecessor across lanes. Dispatch 
 | Duplicate Update after crash | Check exact durable applied identity and ACK without duplicate effects |
 | Gap before next native output | Marshal backfills/holds delivery; native consensus continues |
 
-A callback returning from `report` means retained intake and ordering notification, not durable apply. `Alignment::commit` reflects ordering immediately. Storage requires matching `f+1` certification before canonical application for both direct and imported work. Completed speculation cannot bypass that gate. The App owns each ACK until certified durability covers its input. A certification unit must fit the active delivery window; private computation within the unit precedes its application. Marshal delivery can fill while ACKs are outstanding, independently of native voting/finality. Do not ACK uncertified work to free capacity.
+A callback returning from `report` means retained intake and ordering notification, not durable apply. `Alignment::commit` reflects ordering immediately. Executor requires matching `f+1` certification before requesting canonical application for both direct and imported work. Completed speculation cannot bypass that gate. The App owns each ACK until certified durability covers its input. A certification unit must fit the active delivery window; private computation within the unit precedes its application. Marshal delivery can fill while ACKs are outstanding, independently of native voting/finality. Do not ACK uncertified work to free capacity.
 
 Canonical application and imports share one writer. Recheck descendants after the applied state base moves; stale completions cannot promote another branch. Persist recoverable state, outputs, applied index/block, certificate evidence and direct/imported provenance before ACK. Marshal later persists its own cursor, so recovery must handle redelivery. Pool maintenance stays internal and can reconcile from durable outcomes.
 

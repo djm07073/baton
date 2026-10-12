@@ -1,0 +1,8 @@
+flowchart TB
+    C["Register native + Marshal channels<br/>create App ingress and recover state"] --> N["Start network + full-block buffer"]
+    N --> M["[C] marshal::open<br/>service + resolver bridge"]
+    M --> R["[C] Start resolver using bridge<br/>obtain service.relay"]
+    R --> S["[C] service.start<br/>resolver + verifier + App output"]
+    S --> A["[A] Start App custody / Update handling<br/>with Marshal mailbox"]
+    A --> E["[C] Engine::open<br/>App Automaton + Marshal Relay / Reporter"]
+    E --> T["[C] engine.start → running.ready"]

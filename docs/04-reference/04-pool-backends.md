@@ -4,6 +4,23 @@
 
 **The application owns its transaction pool and reads it in `Automaton::propose`.** The pool retains candidates, supplies a bounded batch for the requested producer context, and receives internal maintenance after durable canonical application. `admit` and `select` describe concrete app operations; they do not require a new public TxPool trait or a separate BlockService.
 
+## Evaluate fit before choosing a backend
+
+```mermaid
+flowchart TB
+    T["Application transaction semantics"] --> N["Nunchi candidate<br/>SHA-256 / nonce-lane fit"]
+    T --> R["Reth candidate<br/>Ethereum pool / provider fit"]
+    T --> C["Constantinople candidate<br/>fixed types / queue lifecycle fit"]
+    N --> A["Check stable bytes, bounded selection<br/>and durable-outcome reconciliation"]
+    R --> A
+    C --> A
+    A --> O["Select one backend<br/>decision remains open"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-44.svg) · [PNG](../assets/diagrams/diagram-44.png)
+
+This map organizes the source-pinned survey, not a selected implementation. Compatibility and lifecycle gaps below must be resolved before reuse.
+
 Admission classifies valid retained transactions as selected or unselected; invalid input is dropped. Selected transactions may enter local batches. Unselected transactions remain available only for the chosen P2P retention/propagation policy. These are logical classes inside one pool.
 
 The connection is `RPC/peer input → app pool → Automaton::propose → TransactionBlock → Marshal::stage_block`. The app returns the body's digest to Multimmit. Local `verify` establishes valid durable custody before the native producer signs the header; proposal construction does not wait for speculative transaction execution. Later `Reporter<Update>` supplies canonical order to the app. After the matching effects are durably applied, internal pool maintenance retires or refreshes candidates under the selected backend's rules. See [the app callback flow](../02-components/05-app-callbacks.md).

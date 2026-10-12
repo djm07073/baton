@@ -4,11 +4,27 @@
 
 **Storage can finish canonical work by importing a verified peer result and handing its checkpoint to Executor.** This is an option during normal validator execution as well as recovery. It uses the same storage ownership, applied-state identity and canonical writer as direct work. The PreCut/Baton scheduler does not approve or relay the transfer.
 
+## Import to checkpoint handoff
+
+```mermaid
+flowchart TB
+    P["Peer certificate + state material"] --> V["Executor<br/>[A] results.accept"]
+    V -->|"VerifiedCertificate"| M["Storage<br/>[A] state.verify_material"]
+    M -->|"matching retained material"| C["Executor → Storage<br/>[P] commit(verified)"]
+    C --> D["[P] StorageEvent::Committed<br/>usable durable checkpoint"]
+    D -->|"[A] execution.install_checkpoint"| E["Skip covered work<br/>retire conflicts, keep valid descendants"]
+    D --> A["App owner<br/>ACK exactly covered Updates"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-32.svg) · [PNG](../assets/diagrams/diagram-32.png)
+
+Invalid or incomplete evidence/material cannot advance state. Imported work retains its provenance and cannot become this node’s own direct-execution signature.
+
 Continue direct work while a certificate or applicable material is missing. A certificate arriving before the matching irrevocable input remains pending or prompts ordering recovery; it cannot settle unresolved order. Stop or fence unfinished direct execution only after both the certificate and usable material have been verified and the canonical writer can safely adopt the target.
 
 ## Responsibilities and communication
 
-Result processing authenticates the target, Storage verifies/retains material and owns the writer, the App owner coordinates Update tokens, and Executor installs the checkpoint. `state.verify_material` is a concrete Storage integration helper; `Storage::certify` accepts the evidence and `StorageEvent::Committed(applied)` publishes durable completion. These are the same [Storage connections](09-storage.md#communication-interfaces) used by direct execution.
+Executor authenticates the target, Storage verifies/retains material and owns the writer, the App owner coordinates Update tokens, and Executor installs the checkpoint. `state.verify_material` is a concrete Storage integration helper; `Storage::commit` accepts Executor-verified authority and `StorageEvent::Committed(applied)` publishes durable completion. These are the same [Storage connections](09-storage.md#communication-interfaces) used by direct execution.
 
 | Stage | App checks | Result |
 |---|---|---|
@@ -51,4 +67,4 @@ For a fresh namespace, `Start::Floor { floor_generation, floor }` requires the c
 
 An in-flight floor change replaces the delivery generation and clears Marshal's previous pending window. The App may still retain old Updates, so `max_pending_acks` alone does not bound queued work across repeated resets. Coordinate each floor transition with App intake, reconcile old exact indices/blocks and bound any overlap before accepting the new window. `Update` carries no generation field; use App-owned transition state rather than inventing an upstream flag. Concrete cross-store switching and recovery sequencing remains implementation work. [Delivery reset](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/actors/delivery/actor.rs#L423).
 
-The normal path is ordered Update → immediate `Alignment::commit(ordered)` and independent App Executor processing → exact-parent reuse/repair or verified import → Storage verifies matching `f+1` evidence and applies durably → `Committed(checkpoint)` → ACK. Both scheduling modes share it. State installation refreshes the shared execution view; it is not a second notification of already-known ordering. An authenticated native floor that advances known ordering must reconcile that prefix through the same idempotent Alignment ordering contract. See [canonical application](../04-reference/03-qmdb.md#commit-a-branch-to-canonical-state) and [result certification](10-result-processing.md#result-certification-inside-executor).
+The normal path is ordered Update → immediate `Alignment::commit(ordered)` and independent App Executor processing → exact-parent reuse/repair or verified import → Executor verifies matching `f+1` evidence and requests Storage commit → `Committed(checkpoint)` → ACK. Both scheduling modes share it. State installation refreshes the shared execution view; it is not a second notification of already-known ordering. An authenticated native floor that advances known ordering must reconcile that prefix through the same idempotent Alignment ordering contract. See [canonical application](../04-reference/03-qmdb.md#commit-a-branch-to-canonical-state) and [result certification](10-result-processing.md#result-certification-inside-executor).

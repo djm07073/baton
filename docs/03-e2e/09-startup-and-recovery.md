@@ -4,13 +4,34 @@
 
 **Start body custody and the App callback path before opening native Multimmit.** Native recovery can call `Automaton::verify` from `Engine::open`. Marshal separately restores its finalized output and delivery cursor, while App restores certified durable state, applied identity and certificate evidence. Configured genesis remains the initial trust anchor; every subsequent applied unit needs recoverable certification evidence.
 
+## Two readiness conditions
+
+```mermaid
+flowchart TB
+    S["App ingress + Marshal custody available"] --> N["[C] Engine::open<br/>may call Automaton::verify"]
+    N --> R["[C] engine.start → running.ready"]
+    S --> C["[A] state.recover<br/>load candidate + original evidence"]
+    C --> V["Executor revalidates evidence<br/>Storage confirms durable record"]
+    V --> A["Install recovered checkpoint"]
+    R --> G["[A] app.activate<br/>native ready AND App base ready"]
+    A --> G
+    G --> D["Dispatch work<br/>reconcile / ACK exact replay"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-42.svg) · [PNG](../assets/diagrams/diagram-42.png)
+
+Invalid recovered evidence stops startup. Fresh configured genesis supplies its trusted checkpoint directly; it does not need an execution certificate.
+
 Read after [App coordination](../02-components/04-app-coordination.md), [Marshal delivery](../02-components/03-marshal-delivery.md) and [Storage](../02-components/09-storage.md). This case follows startup calls, recovered checkpoint handoff and idempotent Update replay through timing, completion and failure paths.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../04-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
 
 ## Startup: prepare custody before native recovery
 
-For a fresh deployment, initialize the configured deterministic App genesis state/runtime and its initial applied-prefix binding. Marshal output index zero represents stream genesis and is never delivered; the first ordinary Update is index one. Do not wait for an index-zero Update or use a producer genesis-header digest as the App state checkpoint. On restart recover the binding; checkpoint startup must authenticate the corresponding floor-to-state relation. The actual App genesis contents remain an application choice. [Output index contract](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/types.rs#L55)
+For a fresh deployment, initialize the configured deterministic App genesis state/runtime and its initial applied-prefix binding. Marshal output index zero represents stream genesis and is never delivered; the first ordinary Update is index one. Do not wait for an index-zero Update or use a producer genesis-header digest as the App state checkpoint. On restart Storage loads the binding and original certificate evidence, Executor revalidates them, and Storage confirms the matching durable record through idempotent commit before checkpoint installation; checkpoint startup must authenticate the corresponding floor-to-state relation. The actual App genesis contents remain an application choice. [Output index contract](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/types.rs#L55)
+
+<details>
+<summary>Detailed interface sequence</summary>
 
 ```mermaid
 sequenceDiagram
@@ -25,6 +46,18 @@ sequenceDiagram
     O->>W: [C] network.start()
     O->>A: [A] app.open(config) -> callback handles
     A->>S: [A] state.recover(config), or configured genesis
+    S-->>A: RecoveredState: checkpoint candidate and original evidence
+    alt Non-genesis recovered state
+        A->>E: [A] results.accept(recovered.evidence, recovered.context)
+        E-->>A: VerifiedCertificate or recovery failure
+        break Invalid or unresolved recovered evidence
+            Note over A,E: Stop startup, no Committed or ACK
+        end
+        E->>S: [P] Storage::commit(verified), confirm recovered durable record
+        S-->>E: Ok(()), matching record accepted
+    else Configured genesis
+        Note over A,S: Configured trusted initial state, no execution certificate
+    end
     S-->>A: [P] StorageEvent::Committed(recovered), checkpoint with pinned StateView
     A->>E: [A] execution.install_checkpoint(recovered.checkpoint)
     Note over O,A: Retained Update ingress exists now, speculative lifecycle stays recovering
@@ -70,6 +103,8 @@ sequenceDiagram
 
 [Open full-size diagram](../assets/diagrams/diagram-13.svg)
 
+</details>
+
 Follow the current [node assembly](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/examples/log-multimmit/src/node.rs#L242) and [Marshal assembly](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/examples/log-multimmit/src/marshal.rs#L126). They create buffered broadcast, `Service`, the generic resolver with `BackfillBridge`, the existing Relay and `SchemeVerifier`. Start the App with Marshal access before `Engine::open(...).await`; waiting for native readiness before making body lookup usable would create a recovery dependency cycle.
 
 `Engine::open` derives the profile, recovers safety state and verifies required recovered payloads, then wires actors. `start(Planes)` spawns them. `Running::ready().await` returns `Result<(), Stopped>` after the native startup milestone; it does not certify App state readiness or remain a live health check. A false or closed recovered verification causes open failure, which is distinct from a stopped running engine. [Engine lifecycle](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/engine/mod.rs#L446)
@@ -84,6 +119,9 @@ A task handle, native ready milestone, or cancelled worker does not establish st
 
 ## Restart and backfill
 
+<details>
+<summary>Detailed interface sequence</summary>
+
 ```mermaid
 sequenceDiagram
     participant O as Node owner
@@ -91,7 +129,19 @@ sequenceDiagram
     participant A as Alignment layer / App owner
     participant E as App Executor
     participant S as Storage
-    O->>S: [A] state.recover(config)
+    A->>S: [A] state.recover(config)
+    S-->>A: RecoveredState: checkpoint candidate and original evidence
+    alt Non-genesis recovered state
+        A->>E: [A] results.accept(recovered.evidence, recovered.context)
+        E-->>A: VerifiedCertificate or recovery failure
+        break Invalid or unresolved recovered evidence
+            Note over A,E: Stop startup, no Committed or ACK
+        end
+        E->>S: [P] Storage::commit(verified), confirm recovered durable record
+        S-->>E: Ok(()), matching record accepted
+    else Configured genesis
+        Note over A,S: Configured trusted initial state, no execution certificate
+    end
     S-->>A: [P] StorageEvent::Committed(recovered), exact prefix and pinned StateView
     A->>E: [A] execution.install_checkpoint(recovered.checkpoint)
     Note over A,E: Skip the recovered prefix, do not recreate its execution
@@ -110,12 +160,14 @@ sequenceDiagram
         E-->>A: StateChanges
         A->>S: [P] Storage::submit(executed, changes)
         S-->>A: Ok(()), retained but not durable
-        S-->>A: [P] StorageEvent::Prepared(prepared)
-        A->>A: [A] App result path obtains certificate evidence
-        Note over A,S: Missing certificate stays pending, no state apply or ACK
-        A->>S: [P] Storage::certify(certificate)
-        S-->>A: Ok(()), admitted for verification, not durable
-        S->>S: Verify f+1, subject, material and current base, apply durably
+        S-->>E: [P] StorageEvent::Prepared(prepared), via App routing
+        E->>E: [A] results.sign(statement, direct_evidence)
+        Note over E: Exchange peer attestations for the same full subject
+        E->>E: [A] results.accept(evidence, canonical_context) -> verified or pending
+        Note over E,S: Missing certificate stays pending, no state apply or ACK
+        E->>S: [P] Storage::commit(verified)
+        S-->>E: Ok(()), commit accepted, not durable
+        S->>S: Match verified subject, prepared material and current base, apply durably
         S-->>A: [P] StorageEvent::Committed(applied)
         A->>A: [A] app.publish_applied(applied)
         A->>E: [A] execution.install_checkpoint(applied.checkpoint)
@@ -127,6 +179,8 @@ sequenceDiagram
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-10.svg)
+
+</details>
 
 | Progress coordinate | Owner and meaning |
 |---|---|

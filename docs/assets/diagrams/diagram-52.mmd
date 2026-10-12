@@ -1,0 +1,8 @@
+flowchart TB
+    N["Multimmit"] -->|"[C] Automaton::propose / verify"| A["App callback handles"]
+    N -->|"[C] Relay::broadcast<br/>Reporter::report(Activity)"| M["Existing Marshal"]
+    A -->|"[C] stage / subscribe / fetch block"| M
+    M -->|"[C] Reporter::report(Update)"| O["App retained Update owner"]
+    O -->|"[C] acknowledge after durable apply"| M
+    A --> P["App pool + candidate admission"]
+    O --> E["App Executor + Storage<br/>canonical state path"]

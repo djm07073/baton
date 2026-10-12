@@ -4,6 +4,24 @@
 
 **App builds and validates transaction bodies; existing Multimmit Marshal stores and exchanges complete blocks.** Put the TxPool inside App. Selected transactions feed `Automaton::propose`; `Automaton::verify` obtains durable custody and makes valid eligible blocks available to the App scheduler.
 
+## Two paths for the same block
+
+```mermaid
+flowchart TB
+    A["App<br/>TransactionBlock"] -->|"[C] stage_block"| M["Marshal custody"]
+    M -->|"[C] Custody::wait succeeds"| D["Durably recoverable block"]
+    M -->|"[C] Relay::broadcast<br/>header digest lookup"| B["Peer body channel<br/>complete block"]
+    N["Multimmit native signing"] -->|"wire: SignedTransactionBlock"| H["Peer native channel<br/>signed header"]
+    D -->|"Local verify true<br/>after payload checks"| N
+    H --> V["Peer App<br/>Automaton::verify"]
+    B -->|"[C] subscribe_block / fetch_block"| V
+    V -->|"valid payload + durable custody"| T["verdict_reply.send(true)"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-24.svg) · [PNG](../assets/diagrams/diagram-24.png)
+
+Header and body may arrive in either order. Fetch or buffered lookup supplies bytes; successful subscription, put or custody wait establishes the durability needed for the verdict.
+
 <a id="reuse-the-same-body-components-as-tempo"></a>
 
 <a id="use-marshals-existing-body-apis"></a>

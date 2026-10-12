@@ -1,0 +1,7 @@
+flowchart TB
+    U["[C] report(Update)<br/>retain block + Exact token"] --> O["[P] Alignment::commit<br/>record ordering promptly"]
+    O --> E["[A] execution.reconcile<br/>reuse / complete / repair unit"]
+    E --> S["[P] Storage::submit<br/>await acceptance"]
+    S -->|"Ok"| N["Worker may take next ordered unit"]
+    S -->|"[P] Prepared"| C["Executor verifies f+1<br/>[P] Storage::commit"]
+    C -->|"[P] Committed after durability"| A["Install checkpoint<br/>ACK exactly covered Updates"]

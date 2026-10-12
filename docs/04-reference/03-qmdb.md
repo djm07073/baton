@@ -2,7 +2,7 @@
 
 <a id="qmdb-branches-reuse-and-state-application"></a>
 
-**Executor computes in memory; Storage owns QMDB and persistent checkpoints.** Executor produces exact effects and outputs over a supplied read-only base. After [`Storage::submit`](01-communication-contracts.md#proposed-storage-interface), Storage materializes selected changes and emits `Prepared` commitments. App supplies certificates through `certify`; Storage verifies them, batches persistence and emits `Committed` with a usable checkpoint. Executor uses `Storage::read` for cold values at that pinned base. A reusable speculative checkpoint need not imply hashing every abandoned attempt.
+**Executor computes in memory; Storage owns QMDB and persistent checkpoints.** Executor produces exact effects and outputs over a supplied read-only base. After [`Storage::submit`](01-communication-contracts.md#proposed-storage-interface), Storage materializes selected changes and emits `Prepared` commitments. Executor verifies matching `f+1` evidence over the prepared state root and exact execution subject, then requests `commit(verified)`; Storage matches prepared material, batches persistence and emits `Committed` with a usable checkpoint. Executor uses `Storage::read` for cold values at that pinned base. A reusable speculative checkpoint need not imply hashing every abandoned attempt.
 
 The current recipe below was checked against Commonware `6233438985d8249d2b2bc1204191d5d405652288`. Earlier `534af0e…` and release comparisons remain [historical reuse evidence](../../assets/review/commonware-reuse-20261004/README.md); they are not the current `DatabaseSet` call sequence.
 
@@ -17,16 +17,18 @@ An unmerkleized batch retains pending mutations. Merkleization consumes the draf
 ```mermaid
 flowchart TB
     M["Multimmit Marshal"] <-->|"[C] report(Update) / ACK"| A["App canonical owner"]
-    A <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges<br/>execution.install_checkpoint: local adoption"| E["App Executor<br/>in-memory overlays and checkpoints"]
+    A <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges<br/>execution.install_checkpoint: local adoption"| E["App Executor<br/>execution, checkpoints and f+1 certification"]
     subgraph S["Storage"]
         R["Pinned read views"]
         P["Selected material and root preparation"]
-        W["Verify f+1 and material<br/>single canonical writer"]
+        B["Concrete QMDB batches"]
+        W["Match verified subject and material<br/>single canonical writer"]
     end
-    A <-->|"[P] Storage::submit(executed, changes)<br/>Ok(()), later StorageEvent::Prepared"| P
-    P -->|"[C] new_batches / fork_batches<br/>[A] materialize StateChanges<br/>[C] merkleize"| B["Concrete QMDB batches"]
-    B -->|"Sealed material"| W
-    A -->|"[P] Storage::certify(certificate)"| W
+    A <-->|"[P] Storage::submit(executed, changes)<br/>Ok(()) accepts the handoff"| P
+    P -->|"[P] StorageEvent::Prepared"| E
+    P -->|"[C] new_batches / fork_batches<br/>[A] materialize StateChanges<br/>[C] merkleize"| B
+    B --> W
+    E -->|"[P] Storage::commit(verified)"| W
     W <-->|"[C] apply / finalize<br/>Barrier::durable() == true"| D["DatabaseSet / QMDB"]
     W -->|"[P] StorageEvent::Committed(applied)<br/>after batched durability"| A
     E <-->|"[P] Storage::read(view, key)<br/>pinned cold state"| R
@@ -133,7 +135,7 @@ After Storage supplies a durable AB checkpoint, Executor installs it and retains
 
 Applying a sealed leaf also applies its unapplied ancestors, so certify and authorize the entire exact prefix it carries. If ABC was speculatively executed but only AB is ordered, prepare and certify AB before applying exactly AB. A terminal certificate for ABC cannot authorize an AB checkpoint unless its signed subject explicitly covers that intermediate boundary. If only a sealed ABC batch exists, applying it and hiding C is invalid; prepare AB from retained exact effects or reexecute. A newly prepared AB commitment may differ from ABC's original parent commitment, so old C reuse requires actual ancestry checks as well as logical input checks.
 
-Storage retains submitted changes independently of flush timing. One canonical writer serves direct and imported results after certificate verification. Physical batching may group successive certified units, but must preserve each signed unit's deterministic operation history, root and recoverable evidence; idle tails and a full delivery window must trigger bounded progress. `submit` acceptance is not durability or permission to prune Executor checkpoints. It validates the original certificate evidence, matching material and actual predecessor before mutation; missing or mismatched certification leaves prepared work pending. Alignment records ordering earlier and supplies no state-commit approval. Advisory cancellation cannot interrupt a by-value DB mutation and turn the lost handle into an ordinary retry. Mutable storage failure is fatal for that instance; recover authoritative durable state rather than continue using it. A readable applied DB with pending flush is not durable completion. A closed/failed barrier is not success or proof of zero disk writes.
+Storage retains submitted changes independently of flush timing. One canonical writer serves direct and imported results after certificate verification. Physical batching may group successive certified units, but must preserve each signed unit's deterministic operation history, root and recoverable evidence; idle tails and a full delivery window must trigger bounded progress. `submit` acceptance is not durability or permission to prune Executor checkpoints. Executor verifies original certificate evidence before commit; Storage matches that verified authority to its material and actual predecessor before mutation; missing or mismatched certification leaves prepared work pending. Alignment records ordering earlier and supplies no state-commit approval. Advisory cancellation cannot interrupt a by-value DB mutation and turn the lost handle into an ordinary retry. Mutable storage failure is fatal for that instance; recover authoritative durable state rather than continue using it. A readable applied DB with pending flush is not durable completion. A closed/failed barrier is not success or proof of zero disk writes.
 
 Reuse existing QMDB, Journal and Metadata mechanisms for app recovery linkage. An atomic Metadata update covers its own store; it does not atomically commit QMDB and another journal. Record enough exact identity and certificate evidence to recover certified state/output/applied-position/provenance consistently before ACK. A durable evidence reference must remain resolvable under pruning. Marshal separately owns its durable delivery cursor; a crash between those stores can redeliver an already applied block, which the app validates and ACKs idempotently. Missing evidence cannot establish applied readiness. No second generic cursor engine or public CommitResult type is required.
 

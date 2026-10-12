@@ -4,6 +4,27 @@
 
 **Existing Multimmit Marshal sends the App complete blocks in canonical order.** Connect `Reporter<Activity = marshal::Update<Block>>` to an App output ingress. The App uses that sequence to select/reuse/repair execution, durably applies it, then acknowledges. Baton scheduling does not reconstruct or reorder this stream.
 
+## Delivery and two durability points
+
+```mermaid
+sequenceDiagram
+    participant M as Marshal
+    participant A as App owner
+    participant S as Executor + Storage
+    M->>A: [C] report(Update)
+    A-->>M: Feedback after retaining block and ACK
+    Note over M,A: Native consensus continues, delivery window is bounded
+    A->>S: [A] Reconcile exact ordered input
+    Note over S: Execute or import, certify f+1, persist
+    S-->>A: [P] StorageEvent::Committed
+    A->>M: [C] acknowledgement.acknowledge()
+    Note over M: Persist contiguous ACK cursor separately
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-25.svg) · [PNG](../assets/diagrams/diagram-25.png)
+
+A crash between App durability and Marshal cursor durability can redeliver an already-applied block. Match its recovered identity and ACK without applying it twice.
+
 ## Communication interfaces
 
 | Direction | Call or value | Completion means |
@@ -33,7 +54,7 @@ An Update contains:
 
 An Update can be App's first encounter with that block, including for an Observer or skipped speculation. Perform the application checks needed for execution, or reuse exact validated work, without requiring an earlier local `verify` or scheduler entry. Marshal's authoritative local order does not implement App transaction semantics; App does not need a second native proof/order verifier.
 
-The retained stream first informs `Alignment::commit(ordered)` of continuous finalized ordering without waiting for execution. Storage separately verifies matching `f+1` result certification before canonical application, for direct work and imports alike. Only after certified application durability does App consume the token with `acknowledge()`. Completed speculation cannot bypass the certificate gate. The token itself performs no I/O and does not make state durable.
+The retained stream first informs `Alignment::commit(ordered)` of continuous finalized ordering without waiting for execution. Executor verifies matching `f+1` result certification before requesting Storage commit, for direct work and imports alike. Only after certified application durability does App consume the token with `acknowledge()`. Completed speculation cannot bypass the certificate gate. The token itself performs no I/O and does not make state durable.
 
 ### Delivery backpressure and recovery
 

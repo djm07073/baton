@@ -1,0 +1,9 @@
+flowchart TB
+    B["Body<br/>application transactions"] -->|"hash"| BD["Body digest"]
+    BD --> H["Producer header<br/>epoch · lane · height · parent"]
+    H -->|"hash"| HD["Header digest"]
+    HD --> R["BlockRef<br/>lane · height · header digest"]
+    H --> F["TransactionBlock<br/>header + body"]
+    B --> F
+    F -->|"[C] report(Update)<br/>finalized order"| E["Executor<br/>exact execution parent + runtime"]
+    E -->|"[P] Storage::submit<br/>StateChanges"| S["Storage-prepared state root"]

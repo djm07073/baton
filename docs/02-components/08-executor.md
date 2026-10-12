@@ -2,7 +2,23 @@
 
 <a id="execution-inside-the-application"></a>
 
-**Executor computes transactions and manages in-memory execution checkpoints.** App coordination supplies jobs and canonical input; Storage supplies pinned cold state and certified durable checkpoints. PreCut and Baton use the same Executor behavior.
+**Executor computes transactions, manages in-memory checkpoints and certifies execution results.** App coordination supplies jobs and canonical input; Storage supplies pinned cold state and certified durable checkpoints. PreCut and Baton use the same Executor behavior.
+
+## Execution, submission and memory
+
+```mermaid
+flowchart TB
+    E["Speculation completed<br/>A → B → C"] --> O{"Marshal orders which prefix?"}
+    O -->|"AB"| R["[A] execution.reconcile<br/>reuse exact AB or repair it"]
+    R -->|"await whole unit"| S["[P] Storage::submit<br/>AB StateChanges"]
+    S -->|"Ok: handoff accepted"| N["Canonical worker may take next unit"]
+    E --> K["Keep compatible C checkpoint<br/>in Executor memory"]
+    D["[P] StorageEvent::Committed<br/>durable AB checkpoint"] -->|"[A] execution.install_checkpoint"| K
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-29.svg) · [PNG](../assets/diagrams/diagram-29.png)
+
+The canonical worker waits through execution and Storage acceptance. Root preparation, f+1 certification and flush complete separately; compatible descendants remain usable.
 
 Native Multimmit's private `AppExecutor` runs `Automaton::propose/verify` callbacks. The App Executor described here is the transaction-computation responsibility inside App.
 
@@ -13,10 +29,11 @@ Native Multimmit's private `AppExecutor` runs `Automaton::propose/verify` callba
 | Execute an exact-parent job | Transaction computation and in-memory effects on the assigned valid checkpoint |
 | Retain reusable work | Checkpoints and StateChanges bound to exact input, parent, runtime and local attempt |
 | Reconcile finalized input | Reuse matching work, finish missing work or repair the differing suffix |
+| Certify results | Bind Storage-prepared state roots to direct execution and exact ordering; sign, collect and verify matching `f+1` evidence before requesting Storage commit |
 | Install durable progress | Adopt Storage's usable checkpoint, skip covered input and retire conflicting attempts |
 | Release memory safely | Preserve compatible descendants and retain overlays/views while workers or references need them |
 
-Alignment selects work; the App owner rechecks and claims the attempt before launch. Storage prepares roots and persists state. App result processing signs and collects evidence. The [App owner](04-app-coordination.md) retains Update ACK tokens and coordinates these independent completions.
+Alignment selects work; the App owner rechecks and claims the attempt before launch. Storage prepares roots and persists state. Result processing is part of Executor: it signs, collects and verifies evidence, then requests commit. The [App owner](04-app-coordination.md) retains Update ACK tokens and coordinates these independent completions.
 
 ## Communication interfaces
 
@@ -25,10 +42,20 @@ Alignment selects work; the App owner rechecks and claims the attempt before lau
 | App dispatch → Executor | `execution.execute(job)` → `ExecutionOutcome` | Exact-parent StateChanges, or failure/cancellation; no persistent write |
 | App canonical owner → Executor | `execution.reconcile(input, canonical_base)` → `StateChanges` | Effects for the required ordered unit, reusing or repairing prior work |
 | Executor → Storage | `Storage::read(view, key)` | Value or absence at the exact pinned base; unavailable views and I/O failures are errors |
-| Executor → App owner → Storage | StateChanges + bound `ExecutedRange`, then `Storage::submit` | Storage retains accepted ordered progress; Executor does not choose flush timing |
+| Executor → App owner → Storage | StateChanges + bound `ExecutedRange`, then `Storage::submit(...).await` | The canonical worker completes the unit's execution-to-storage handoff only after Storage accepts it; flush timing belongs to Storage |
+| Storage → Executor, through App routing | `StorageEvent::Prepared(prepared)` | State root and result commitments for signing against retained direct-execution evidence |
+| Executor → Storage | `Storage::commit(verified)` | Accept a commit request after Executor completes `f+1` verification; durability arrives later |
 | Storage → App owner → Executor | `StorageEvent::Committed(applied)`, then `execution.install_checkpoint(applied.checkpoint)` | Install a certified durable base and skip its covered input |
 
 `execute`, `reconcile` and `install_checkpoint` are concrete App operations described in the [communication contracts](../04-reference/01-communication-contracts.md#private-pool-and-execution-calls). The shared owner binds changes to accepted job metadata before submission. Storage receives StateChanges rather than an Executor memory checkpoint, root or database batch.
+
+## Execution-to-Storage completion
+
+For each direct canonical unit, the App canonical worker awaits all required execution or exact-result reuse, then awaits `Storage::submit(executed, changes)`. Only `Ok(())` completes this handoff and lets that worker advance to the next ordered unit. Computation finishing or placing changes in an intermediate App queue does not complete it. Pending or rejected submission keeps the unit and its retryable changes retained; storage-instance failure requires recovery.
+
+For speculative ABC with only AB finalized, reconcile all of AB and await Storage's acceptance of AB's changes. Keep C in memory. After acceptance, the canonical worker can process the next ordered unit without waiting for root preparation, certification or disk flush. Existing compatible speculation is retained independently.
+
+This is a sequential async operation in the canonical worker. The App event loop, native callbacks and Storage event intake remain serviceable while it waits. There is no new `Executor::flush` method or change to ordering-only `Alignment::commit`. Memory reclamation still follows durable checkpoint installation and safe reference release.
 
 ## Exact parents and reusable work
 
@@ -39,6 +66,18 @@ Candidate metadata identifies the exact block; an execution attempt also identif
 Preserve completed/current `F` and sort only pending eligible inputs. A state-dependent child starts when the valid predecessor checkpoint is ready. Missing/unfinished parents leave work pending. A new arrival does not cancel or relabel started work; a new canonical Update may require exact-parent repair. [Scheduling rule](07-alignment.md#global-rule-for-local-execution-and-reports).
 
 ## Cold reads and checkpoint installation
+
+```mermaid
+flowchart TB
+    K["Read key"] --> W{"Current writes / parent overlays?"}
+    W -->|"Value"| V["Return value"]
+    W -->|"Tombstone"| N["Return absent<br/>no older-state fallback"]
+    W -->|"Genuine miss"| S["[P] Storage::read(view, key)<br/>same pinned base for the job"]
+    S -->|"Some / None"| R["Return value / verified absence"]
+    S -->|"Unavailable view / I/O error"| E["Propagate failure<br/>never read a different base"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-55.svg) · [PNG](../assets/diagrams/diagram-55.png)
 
 Read current and parent overlays first, including tombstones. Only a genuine miss calls `Storage::read` against the retained base view. A failed or unavailable read never means absent data and never switches the job to a newer base. Failure/cancellation cannot produce a reusable completed checkpoint.
 
@@ -54,7 +93,7 @@ The full `commonware_glue::stateful::Application` lifecycle is optional referenc
 
 ## Result certification and state sync
 
-[App result processing](10-result-processing.md) combines accepted direct-execution evidence with Storage-prepared commitments and peer signatures. Storage independently checks matching `f+1` evidence before applying direct or imported results. While certification is pending, valid private execution may continue; canonical state and ACK do not advance.
+[Executor result certification](10-result-processing.md) combines accepted direct-execution evidence with Storage-prepared commitments and peer signatures. Executor validates matching `f+1` evidence before requesting Storage commit for direct or imported results. While certification is pending, valid private execution may continue; canonical state and ACK do not advance.
 
 [State sync](11-state-sync.md) supplies the same durable checkpoint handoff. Imported work retains its provenance and cannot produce the node's own direct-execution signature. Later work executed directly from that checkpoint may be signed.
 

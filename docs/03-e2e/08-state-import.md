@@ -4,13 +4,33 @@
 
 **An App may import verified peer material during normal execution.** It verifies the result certificate and exact input context, checks applicable material, then fences conflicting work and applies through the same canonical writer used for direct execution.
 
-Read after [certified checkpoint handoff](../02-components/11-state-sync.md). This case follows material verification, `Storage::certify`, `Committed` and Executor checkpoint installation through timing, completion and failure paths.
+## Safe import at a glance
+
+```mermaid
+flowchart TB
+    P["Peer result"] --> V["Executor<br/>[A] results.accept"]
+    V --> M["Storage<br/>[A] state.verify_material"]
+    M -->|"verified and retained"| C["[P] Storage::commit(verified)<br/>single canonical writer"]
+    C -->|"[P] Committed"| I["[A] execution.install_checkpoint<br/>skip covered work, retire conflicts"]
+    C -->|"[P] Committed"| A["App owner ACKs covered Updates"]
+    V -->|"invalid / unresolved"| W["No import commit<br/>valid direct work can continue"]
+    M -->|"missing / mismatch"| W
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-41.svg) · [PNG](../assets/diagrams/diagram-41.png)
+
+Checkpoint installation adds no extra ACK round. Applying imported material and direct effects share writer fencing and exact predecessor checks.
+
+Read after [certified checkpoint handoff](../02-components/11-state-sync.md). This case follows material verification, `Storage::commit`, `Committed` and Executor checkpoint installation through timing, completion and failure paths.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../04-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
 
 ## State sync from certified execution results
 
-State sync belongs to Storage. Executor receives its usable durable checkpoint and skips the covered local computation. Peer result messages do not pass through either scheduler mode for approval. The path shares the single writer, access fencing and durability contract of [canonical application](06-ordered-application.md).
+Executor verifies the import certificate and requests commit after Storage verifies and retains the matching material. Storage owns material transfer and persistence; Executor receives its usable durable checkpoint and skips the covered local computation. Peer result messages do not pass through either scheduler mode for approval. The path shares the single writer, access fencing and durability contract of [canonical application](06-ordered-application.md).
+
+<details>
+<summary>Detailed interface sequence</summary>
 
 ```mermaid
 sequenceDiagram
@@ -20,21 +40,21 @@ sequenceDiagram
     participant E as App Executor
     participant M as Multimmit Marshal
     Note over A,E: Local Executor is at A, certified target covers ABC
-    P-->>A: wire: ExecutionCertificate(statement, signatures)
-    A->>A: [A] results.accept(certificate, canonical_context)
+    P-->>E: wire: ExecutionCertificate(statement, signatures)
+    E->>E: [A] results.accept(certificate, canonical_context) -> verified or pending
     alt Invalid or unresolved irrevocable input / base
-        Note over A: Reject or retain pending evidence, continue valid direct work
+        Note over E: Reject or retain pending evidence, continue valid direct work
     else VerifiedCertificate for exact input and base
-        A-->>P: wire: MaterialRequest(verified_target)
-        P-->>A: wire: StateMaterial(target, data, outputs)
-        A->>S: [A] state.verify_material(certificate, material, base)
-        S-->>A: PreparedImport or unavailable / invalid
+        E-->>P: wire: MaterialRequest(verified_target)
+        P-->>E: wire: StateMaterial(target, data, outputs)
+        E->>S: [A] state.verify_material(verified, material, base)
+        S-->>E: PreparedImport or unavailable / invalid
         alt Material not applicable
             Note over A: Continue direct work, no authority transfer
         else Verified applicable PreparedImport
-            A->>S: [P] Storage::certify(certificate)
-            S-->>A: Ok(()), admitted for verification, not durable
-            Note over A,S: Verify f+1 and material, recheck base and fence conflicts before mutation
+            E->>S: [P] Storage::commit(verified)
+            S-->>E: Ok(()), commit accepted, not durable
+            Note over E,S: Executor verified f+1, Storage matches material and rechecks base before mutation
             alt Rejected before mutation
                 S-->>A: [P] StorageEvent::Failed(failure), no ACK
                 Note over A,S: Retain input, reconcile context, no ACK
@@ -57,6 +77,8 @@ sequenceDiagram
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-14.svg)
+
+</details>
 
 Direct and imported state application both require a matching verified `f+1` certificate. Alignment records ordering independently. A certificate alone does not justify stopping unfinished execution; applicable material must also be verified. Do not apply a canonical-base delta to arbitrary partial speculative state. A verified import can satisfy an outstanding Update only when its exact input and durable applied identity cover that Update in order. Do not synthesize ACK tokens or skip unrelated outstanding delivery.
 

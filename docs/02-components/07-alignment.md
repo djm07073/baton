@@ -4,6 +4,22 @@
 
 **Both schedulers consume usable blocks and the same canonical Marshal Updates. Pre-cut starts local work early. Baton additionally exchanges intended orders and chooses advisory direction.** Execution workers, checkpoints, storage, result certification and state sync belong to the same application in both modes.
 
+## Common scheduling interface
+
+```mermaid
+flowchart TB
+    C["Valid usable candidate"] -->|"[P] Alignment::admit"| P["PreCutAlignment<br/>or BatonAlignment"]
+    O["Finalized ordering"] -->|"[P] Alignment::commit"| P
+    V["Current execution / resource view"] -->|"[P, internal] AlignmentPolicy::next"| P
+    P -->|"JobIntent or None"| A["App owner<br/>recheck and claim"]
+    A -->|"[A] execution.execute"| E["Exact-parent worker"]
+    B["Baton only<br/>reports / advisory direction"] -.->|"internal scheduling policy"| P
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-28.svg) · [PNG](../assets/diagrams/diagram-28.png)
+
+`admit` registers candidates, `next` selects an intent, and `commit` records ordering. The owner starts work; Executor and Storage handle certification and state durability.
+
 ## Responsibilities and communication interfaces
 
 Alignment owns eligible candidates and pending scheduling policy. It preserves started order `F`, records finalized ordering and selects work from the execution view. The App owner claims/dispatches the selected work; Executor owns checkpoints and Storage owns persistence.
@@ -34,9 +50,7 @@ A scheduler chooses **what to start next**. It does not duplicate Marshal's hist
 
 Keep completed/current execution order `F` on a valid local path. Sort only eligible, authenticated, not-yet-started candidates `S_pending` after the immutable frontier and within the selected horizon:
 
-```text
-intended_order = F ++ sort_G(S_pending)
-```
+**Intended order = `F ++ sort_G(S_pending)`.**
 
 `F`, `G` and `S_pending` are explanatory notation. They do not require public Rust types or a `GlobalRule` trait. Required producer ancestry/dependencies still hold. Comparator, deterministic tie-break and rule identity remain open; arrival time is not the tie-break.
 
@@ -55,7 +69,7 @@ The local started prefix is not canonical. A later continuous Marshal Update can
 
 Both schedulers use the same [canonical Update worker](05-app-callbacks.md#marshal-reportupdate-canonical-input-and-ack). Compare retained work with the exact canonical predecessor, ordered prefix, input state and runtime. A matching block digest alone is insufficient, and a producer-header parent is not the merged execution parent. Missing required bodies or state keep work pending; they do not create empty inputs.
 
-Alignment records the exact finalized order through `commit(ordered)` immediately. App Executor independently reuses or repairs that path in memory. Storage verifies its matching `f+1` certificate and applies durably, then supplies a usable checkpoint back to Executor. Installation advances the execution base, skips covered inputs and retires conflicting work; ACK remains tied to certified durability. Retain compatible descendants only within the resource and retention budget. Reports and direction add no approval step.
+Alignment records the exact finalized order through `commit(ordered)` immediately. App Executor independently reuses or repairs that path in memory. Executor verifies its matching `f+1` certificate and requests Storage commit; Storage applies it durably and supplies a usable checkpoint back to Executor. Installation advances the execution base, skips covered inputs and retires conflicting work; ACK remains tied to certified durability. Retain compatible descendants only within the resource and retention budget. Reports and direction add no approval step.
 
 ## Leader: choose direction from reports
 

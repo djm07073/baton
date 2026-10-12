@@ -2,6 +2,22 @@
 
 **Start with current `log-multimmit` and replace its synthetic App behavior with transaction handling and scheduling.** The existing Engine/Marshal graph already provides producer consensus, body custody, backfill and canonical delivery. Keep one App containing its pool, selected scheduler, execution workers and state backend.
 
+## Implementation dependency map
+
+```mermaid
+flowchart TB
+    N["Reuse log-multimmit node / Marshal assembly"] --> A["Implement App body + callbacks<br/>retain custody and ordered Updates"]
+    A --> E["Connect pool, Alignment and Executor<br/>exact-parent work + StateChanges"]
+    E --> S["Connect Storage + Executor certification<br/>durable checkpoint + ACK"]
+    S --> T["Deterministic E2E + crash/recovery checks"]
+    T --> B["Compare Original / PreCut / Baton<br/>same backend and endpoint"]
+    X["Full Baton: native policy design and proof"] -.-> T
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-46.svg) · [PNG](../assets/diagrams/diagram-46.png)
+
+The native policy extension is required for full Baton ordering claims. A shared App execution path or a successful documentation build does not establish that extension.
+
 ## Commonware integration anchors
 
 Current native source is [6233438985d8249d2b2bc1204191d5d405652288](https://github.com/0xEyrie/monorepo/tree/6233438985d8249d2b2bc1204191d5d405652288). These anchors describe that checkout, not the older research baseline.
@@ -21,25 +37,20 @@ Body lookup/fetch and custody completion are separate: `get_block` and `fetch_bl
 
 Use this connection sequence; names below are explanatory pseudocode around existing APIs, not a compiled constructor recipe:
 
-```text
-register native data, consensus, certificate, resolver channels
-register Marshal body-broadcast and backfill channels
-create App ingress handles; reopen App durable state
-start network and buffered full-block broadcast
-(service, bridge) = await marshal::open(runtime, config, buffer)
-start existing resolver with bridge as Producer and Consumer
-relay = service.relay(local_producer_chain)
-(marshal, service_handle) = service.start(resolver, SchemeVerifier, app_output)
-start App custody/output processing with marshal.clone()
-engine = await Engine::open(config {
-    automaton: app_automaton,
-    relay,
-    reporter: marshal,
-    ...
-})
-running = engine.start(native_planes)
-await running.ready()
+```mermaid
+flowchart TB
+    C["Register native + Marshal channels<br/>create App ingress and recover state"] --> N["Start network + full-block buffer"]
+    N --> M["[C] marshal::open<br/>service + resolver bridge"]
+    M --> R["[C] Start resolver using bridge<br/>obtain service.relay"]
+    R --> S["[C] service.start<br/>resolver + verifier + App output"]
+    S --> A["[A] Start App custody / Update handling<br/>with Marshal mailbox"]
+    A --> E["[C] Engine::open<br/>App Automaton + Marshal Relay / Reporter"]
+    E --> T["[C] engine.start → running.ready"]
 ```
+
+[Open full-size diagram](../assets/diagrams/diagram-54.svg) · [PNG](../assets/diagrams/diagram-54.png)
+
+App custody processing must answer recovery verification during `Engine::open`. Activate speculative dispatch only after both native readiness and the matching recovered App base are established.
 
 `Engine::open` spawns no native actors. `marshal::open` already starts its catalog and optional promoter; `Service::start` starts the remaining Marshal actors. Own that entire startup attempt through the existing node/runtime lifetime so a later open failure does not leave earlier services unmanaged. [Marshal lifecycle](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/service/mod.rs#L1).
 
@@ -61,7 +72,7 @@ For checkpoint bootstrap, `Start::Floor` only seeds a fresh namespace and requir
 
 ### Baton confirmed-order assembly
 
-Use Marshal's existing canonical `Update` stream for both PreCut and Baton. Marshal already implements the body/proof backfill, native order reconstruction, catalog and ACK cursor previously assigned to a proposed Baton Orderer. App's retained-input handler notifies Alignment of ordering; Executor computes in memory; App result handling collects evidence; Storage validates it, applies durably and supplies a usable checkpoint back to Executor. [Ordered input](../02-components/03-marshal-delivery.md).
+Use Marshal's existing canonical `Update` stream for both PreCut and Baton. Marshal already implements the body/proof backfill, native order reconstruction, catalog and ACK cursor previously assigned to a proposed Baton Orderer. App's retained-input handler notifies Alignment of ordering; Executor computes in memory; Executor result handling collects and verifies evidence, then requests Storage commit; Storage matches material and applies durably and supplies a usable checkpoint back to Executor. [Ordered input](../02-components/03-marshal-delivery.md).
 
 The native extension for full Baton is narrower and still unresolved: prepared policy must be bound to the actual leader proposal and interpreted identically by native validation/recovery and Marshal. Sorting output Updates locally is invalid. [Policy TODO](05-native-open-decisions.md#todo-bind-baton-prefix-and-policy-to-cut-proposals).
 

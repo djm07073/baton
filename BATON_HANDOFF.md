@@ -1,6 +1,14 @@
 # Baton — current research handoff
 
-Updated 2026-10-11. The newest decision below supersedes earlier architecture entries; those entries preserve research and publication history. Research/specification work only; no completed Baton native integration proof or application E2E results.
+Updated 2026-10-12. The newest decision below supersedes earlier architecture entries; those entries preserve research and publication history. Research/specification work only; no completed Baton native integration proof or application E2E results.
+
+## 2026-10-12 Executor certification and Storage commit
+
+Executor now owns signing, collecting and verifying f+1 matching execution-result evidence. Storage prepares the state root from retained StateChanges and sends Prepared to Executor. Executor binds that root to exact order/range, predecessor, runtime and result commitments, then requests Storage::commit(verified). Storage matches the verified subject to prepared material and the current predecessor, persists state plus original evidence and emits Committed. The proposed read/submit/commit contract replaces read/submit/certify. VerifiedCertificate is a local Executor-verifier output with restricted construction, not a wire object or persisted trust flag. Recovery reloads original evidence and has Executor reverify it before confirming the durable checkpoint; imports use the same verifier and writer. Result processing is an Executor responsibility, not a separate component. Execution through submit acceptance stays synchronized as recorded below. See [result certification](docs/02-components/10-result-processing.md) and the [Storage contract](docs/04-reference/01-communication-contracts.md#proposed-storage-interface).
+
+## 2026-10-12 Synchronous execution-to-Storage handoff
+
+The direct canonical worker awaits execution/reuse/repair of the complete ordered unit and then Storage::submit acceptance before completing the handoff or starting the next ordered unit. Pending/rejected submission retains retryable work; storage-instance failure requires recovery. This synchronizes execution through Storage retention, while root preparation, f+1 certification and physical flush remain later work. Native callbacks, independent speculation and Storage event intake continue to be serviced. The existing method/return arrows express the sequence; no Executor::flush method or new trait is added. See [Executor completion](docs/02-components/08-executor.md#execution-to-storage-completion) and [ordered submission](docs/04-reference/01-communication-contracts.md#ordered-progress-submission-and-batched-persistence).
 
 ## 2026-10-11 Numbered documentation layout
 

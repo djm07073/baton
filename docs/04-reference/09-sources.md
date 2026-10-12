@@ -2,6 +2,21 @@
 
 **Current user decisions and the inspected parent checkout define this implementation design.** Earlier papers, linked documents and review receipts retain their historical meaning.
 
+## Which source answers which question?
+
+```mermaid
+flowchart TB
+    U["Current user decisions"] --> D["docs/<br/>current App design"]
+    N["Native source pin 6233438<br/>existing Engine / Marshal behavior"] --> D
+    H["Paper + historical reviews<br/>motivation and prior investigations"] -.->|"context, preserve original scope"| D
+    D --> S["Generated site + diagram assets"]
+    R["Rust reference page"] --> X["Generated existing-API excerpts"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-48.svg) · [PNG](../assets/diagrams/diagram-48.png)
+
+Current Markdown is canonical. Historical sources retain their pins; generated artifacts are views of the current documentation, not implementation evidence.
+
 ## Sources and document status
 
 | Source | Role in these docs |

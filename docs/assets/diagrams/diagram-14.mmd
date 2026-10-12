@@ -5,21 +5,21 @@ sequenceDiagram
     participant E as App Executor
     participant M as Multimmit Marshal
     Note over A,E: Local Executor is at A, certified target covers ABC
-    P-->>A: wire: ExecutionCertificate(statement, signatures)
-    A->>A: [A] results.accept(certificate, canonical_context)
+    P-->>E: wire: ExecutionCertificate(statement, signatures)
+    E->>E: [A] results.accept(certificate, canonical_context) -> verified or pending
     alt Invalid or unresolved irrevocable input / base
-        Note over A: Reject or retain pending evidence, continue valid direct work
+        Note over E: Reject or retain pending evidence, continue valid direct work
     else VerifiedCertificate for exact input and base
-        A-->>P: wire: MaterialRequest(verified_target)
-        P-->>A: wire: StateMaterial(target, data, outputs)
-        A->>S: [A] state.verify_material(certificate, material, base)
-        S-->>A: PreparedImport or unavailable / invalid
+        E-->>P: wire: MaterialRequest(verified_target)
+        P-->>E: wire: StateMaterial(target, data, outputs)
+        E->>S: [A] state.verify_material(verified, material, base)
+        S-->>E: PreparedImport or unavailable / invalid
         alt Material not applicable
             Note over A: Continue direct work, no authority transfer
         else Verified applicable PreparedImport
-            A->>S: [P] Storage::certify(certificate)
-            S-->>A: Ok(()), admitted for verification, not durable
-            Note over A,S: Verify f+1 and material, recheck base and fence conflicts before mutation
+            E->>S: [P] Storage::commit(verified)
+            S-->>E: Ok(()), commit accepted, not durable
+            Note over E,S: Executor verified f+1, Storage matches material and rechecks base before mutation
             alt Rejected before mutation
                 S-->>A: [P] StorageEvent::Failed(failure), no ACK
                 Note over A,S: Retain input, reconcile context, no ACK

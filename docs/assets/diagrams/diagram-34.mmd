@@ -1,0 +1,9 @@
+flowchart TB
+    T["Transaction"] -->|"[A] pool.admit / select"| B["[C] Automaton::propose<br/>stage full block"]
+    B --> V["[C] Automaton::verify<br/>validity + durable custody"]
+    V -->|"eligible candidate"| X["[P] admit / internal next<br/>early execution"]
+    V --> N["Native signing / DA / finality"]
+    N -->|"[C] report(Update)"| O["Canonical execution<br/>reuse or repair exact order"]
+    X -.->|"matching work"| O
+    O -->|"[P] submit → Prepared"| C["Executor f+1 certification<br/>[P] Storage::commit"]
+    C -->|"[P] Committed"| A["Install checkpoint + ACK"]

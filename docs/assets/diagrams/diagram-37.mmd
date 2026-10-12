@@ -1,0 +1,8 @@
+flowchart TB
+    R["Valid intended-order reports"] --> S["Close snapshot once<br/>first 4f+1 or fixed deadline"]
+    S --> E["Finish bounded candidate evaluation<br/>2f+1 entire-prefix support, else sum-LCP"]
+    E --> D["Prepared advisory direction"]
+    C["Native cut opportunity"] --> Q{"Valid policy ready<br/>for actual context?"}
+    D -.->|"[X] authenticated adoption hook"| Q
+    Q -->|"Yes"| P["[X] Freeze and preserve policy<br/>in authenticated proposal"]
+    Q -->|"No, before adoption"| B["Use actual-parent valid base<br/>without waiting"]

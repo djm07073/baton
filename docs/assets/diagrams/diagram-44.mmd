@@ -1,0 +1,8 @@
+flowchart TB
+    T["Application transaction semantics"] --> N["Nunchi candidate<br/>SHA-256 / nonce-lane fit"]
+    T --> R["Reth candidate<br/>Ethereum pool / provider fit"]
+    T --> C["Constantinople candidate<br/>fixed types / queue lifecycle fit"]
+    N --> A["Check stable bytes, bounded selection<br/>and durable-outcome reconciliation"]
+    R --> A
+    C --> A
+    A --> O["Select one backend<br/>decision remains open"]

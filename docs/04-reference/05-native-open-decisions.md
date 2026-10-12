@@ -4,6 +4,21 @@
 
 **The base Engine/Marshal connection already exists.** Remaining application choices concern body validity/bounds, scheduling and state application. Full Baton's change to authenticated ordering requires native protocol work beyond those callbacks.
 
+## Existing path and unfinished Baton extension
+
+```mermaid
+flowchart TB
+    E["Existing native Engine + Marshal"] --> A["App callbacks<br/>pool, local scheduling, execution"]
+    B["Baton prepared direction"] -.-> X["[X] Bind actual context and policy<br/>to authenticated leader proposal"]
+    X -.-> V["[X] Validate exact leading-prefix preservation"]
+    V -.-> R["[X] Preserve extension / view recovery<br/>and Marshal interpretation"]
+    R -.-> T["Protocol tests + safety / liveness evidence"]
+```
+
+[Open full-size diagram](../assets/diagrams/diagram-45.svg) · [PNG](../assets/diagrams/diagram-45.png)
+
+Dashed steps are required work, not implemented hooks. Ordinary App scheduling cannot change the canonical order already delivered by Marshal.
+
 ## TODO: bind Baton prefix and policy to cut proposals
 
 **Status: not implemented or proved.** Current `LeaderBlock` contains `round`, `parent`, `history` and per-lane `proposals`. It carries no selected Baton cross-lane prefix or frozen policy. `Automaton::propose` constructs a producer body, not this leader proposal; `Reporter<Activity>` observes admitted activity and cannot validate proposals before voting. [Current LeaderBlock](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/types/block.rs#L802).

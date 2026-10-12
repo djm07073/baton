@@ -1,0 +1,7 @@
+flowchart TB
+    I["Client / peer transaction"] -->|"[A] pool.admit"| V{"Valid payload?"}
+    V -->|"No"| X["Reject"]
+    V -->|"Yes"| C["Retain selected / unselected candidates"]
+    C -->|"[A] pool.select<br/>selected candidates only"| B["Retained bounded batch"]
+    B -->|"[C] TransactionBlock::from_context"| P["Proposal body"]
+    D["Certified durable outcomes"] -->|"[A] pool.reconcile"| C

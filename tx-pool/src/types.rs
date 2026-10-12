@@ -1,4 +1,4 @@
-//! Pool inputs supplied by Network and Execution, without importing their internals.
+//! Pool inputs supplied by Node and Execution, without importing their internals.
 
 /// Trusted epoch, local producer lane, producer-lane set and shared assignment rule.
 /// MODEL-01/POOL-01: define epoch/lane transaction-type eligibility; bucket layout stays internal.

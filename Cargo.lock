@@ -216,7 +216,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "baton-network"
+name = "baton-node"
 version = "0.1.0"
 dependencies = [
  "baton-alignment",

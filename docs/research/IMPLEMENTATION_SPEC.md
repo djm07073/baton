@@ -28,7 +28,7 @@ The source before page partitioning is preserved in the [archived snapshot](arch
 
 <a id="16-p2p-연결과-message-planes"></a>
 
-[P2P and message paths](../../network/README.md#networking-p2p-connections-and-message-planes)
+[P2P and message paths](../../node/README.md#networking-p2p-connections-and-message-planes)
 
 <a id="17-rust-trait를-읽는-방법"></a>
 
@@ -52,27 +52,27 @@ The source before page partitioning is preserved in the [archived snapshot](arch
 
 <a id="41-역할과-책임"></a>
 
-[Consensus: native structure](../../network/README.md#multimmit-roles-and-responsibilities)
+[Consensus: native structure](../../node/README.md#multimmit-roles-and-responsibilities)
 
 <a id="46-실제-native-actor와-파일-구조"></a>
 
-[Consensus: native structure](../../network/README.md#multimmit-native-actors-and-source-layout)
+[Consensus: native structure](../../node/README.md#multimmit-native-actors-and-source-layout)
 
 <a id="42-인터페이스-개요"></a>
 
-[Block construction and body exchange](../../network/README.md#marshal-custody-interface-overview)
+[Block construction and body exchange](../../node/README.md#marshal-custody-interface-overview)
 
 <a id="43-mempool에서-가져와-블록-생성"></a>
 
-[Block construction and body exchange](../../network/README.md#marshal-custody-select-transactions-and-build-a-block)
+[Block construction and body exchange](../../node/README.md#marshal-custody-select-transactions-and-build-a-block)
 
 <a id="44-블록-전파조회custody"></a>
 
-[Block construction and body exchange](../../network/README.md#marshal-custody-body-dissemination-lookup-and-custody)
+[Block construction and body exchange](../../node/README.md#marshal-custody-body-dissemination-lookup-and-custody)
 
 <a id="45-합의와-baton-연결"></a>
 
-[Finalized ordered input](../../network/README.md#marshal-delivery-consensus-and-baton-integration)
+[Finalized ordered input](../../node/README.md#marshal-delivery-consensus-and-baton-integration)
 
 <a id="47-미결정-사항"></a>
 
@@ -228,7 +228,7 @@ The source before page partitioning is preserved in the [archived snapshot](arch
 
 <a id="4-consensus-레이어-commonware-multimmit"></a>
 
-[Consensus: native structure](../../network/README.md#multimmit)
+[Consensus: native structure](../../node/README.md#multimmit)
 
 <a id="5-baton-레이어"></a>
 

@@ -22,7 +22,7 @@ This is the direct path. Verified import and recovered durable replay use the sa
 
 <a id="cut-commit--ordered-range--execution-commit"></a>
 
-Read after [Marshal delivery](../../network/README.md#marshal-delivery), [Execution](../../execution/README.md#execution) and [Storage](../../storage/README.md#persistence). This case follows ordering-only `Alignment::commit`, StateChanges, Storage events and the retained ACK through timing, completion and failure paths.
+Read after [Marshal delivery](../../node/README.md#marshal-delivery), [Execution](../../execution/README.md#execution) and [Storage](../../storage/README.md#persistence). This case follows ordering-only `Alignment::commit`, StateChanges, Storage events and the retained ACK through timing, completion and failure paths.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../03-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
 

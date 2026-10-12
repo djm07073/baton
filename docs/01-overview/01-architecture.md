@@ -1,6 +1,6 @@
 # Architecture
 
-**Network connects native consensus; TxPool retains transactions; Alignment selects work; Execution coordinates and executes; Storage persists certified state.** Execution implements existing Automaton/Reporter callbacks and owns retained delivery/ACKs, checkpoints and result certification. The five crates communicate through the contracts below.
+**Node connects native consensus; TxPool retains transactions; Alignment selects work; Execution coordinates and executes; Storage persists certified state.** Execution implements existing Automaton/Reporter callbacks and owns retained delivery/ACKs, checkpoints and result certification. The five crates communicate through the contracts below.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [communication reference](../03-reference/01-communication-contracts.md#diagram-notation) for call/event notation.
 
@@ -8,7 +8,7 @@ Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned process
 
 ```mermaid
 flowchart TB
-    W["network crate<br/>assembly and service lifetime"] -->|"[C] Engine::open / start<br/>marshal::open / Service::start"| N["Multimmit Engine + Marshal"]
+    W["node crate<br/>assembly and service lifetime"] -->|"[C] Engine::open / start<br/>marshal::open / Service::start"| N["Multimmit Engine + Marshal"]
     W -->|"[A] Execution::open / start<br/>pool, alignment, storage, mailbox"| E
     N <-->|"[C] Automaton::propose / verify<br/>Reporter::report(Update)<br/>Mailbox custody / ACK"| E["execution crate<br/>callbacks, coordination, execution<br/>checkpoints and result certification"]
     E <-->|"[A] TxPool::admit / select / reconcile"| P["tx-pool crate<br/>retained transactions and payloads"]
@@ -33,9 +33,9 @@ Blue boxes are existing Commonware modules. Green boxes show the five crate resp
 
 | Component | Responsibility | Communication |
 |---|---|---|
-| [Multimmit](../../network/README.md#multimmit) | Producer lanes, DA, views and native finality | Calls App Automaton; sends Activity and relay requests to Marshal |
-| [Marshal](../../network/README.md#marshal-custody) | Full blocks, native history, backfill and ordered delivery | Custody mailbox calls; indexed Update and application ACK |
-| [Network](../../network/README.md) | Transport, construction and supervised service lifetime | Connects existing Engine/Marshal and injects pool/policy/storage into Execution |
+| [Multimmit](../../node/README.md#multimmit) | Producer lanes, DA, views and native finality | Calls App Automaton; sends Activity and relay requests to Marshal |
+| [Marshal](../../node/README.md#marshal-custody) | Full blocks, native history, backfill and ordered delivery | Custody mailbox calls; indexed Update and application ACK |
+| [Node](../../node/README.md) | Transport, construction and supervised service lifetime | Connects existing Engine/Marshal and injects pool/policy/storage into Execution |
 | [TxPool](../../tx-pool/README.md#pool) | Admission, retained candidates and bounded selection | Transactions in; proposal batches out; durable outcomes for maintenance |
 | [Alignment](../../alignment/README.md#alignment) | Eligible pending work and finalized-order reflection | `admit/commit`; public `next` selects an intent from the execution view |
 | [Execution](../../execution/README.md#coordination) | Native callbacks, coordination/ACKs, transaction computation, checkpoints and result certification | Exact-parent jobs, StateChanges, prepared roots, verified commit requests and checkpoint installation |

@@ -1,6 +1,6 @@
 # Roles and terminology
 
-**Network assembles TxPool, Alignment, Execution and Storage with the existing Multimmit and Marshal.** These five crates divide application responsibilities. The native App role is implemented by Execution; crate boundaries do not require separate actors.
+**Node assembles TxPool, Alignment, Execution and Storage with the existing Multimmit and Marshal.** These five crates divide application responsibilities. The native App role is implemented by Execution; crate boundaries do not require separate actors.
 
 ## Block identity and execution state
 
@@ -26,7 +26,7 @@ The producer header identifies the block in its lane. The execution parent ident
 |---|---|
 | Multimmit Engine | Native producer signing, DA, leader proposal/voting, finality and safety recovery |
 | Multimmit Marshal | Complete-block custody/broadcast/backfill, ordinary native total-order interpretation, indexed delivery and durable ACK cursor |
-| Network | Assemble the five crates, native services and transport; supervise startup and shutdown |
+| Node | Assemble the five crates, native services and transport; supervise startup and shutdown |
 | TxPool | Validate and retain/share transactions by type; select eligible type pools for the proposal epoch/lane and reconcile durable outcomes from all lanes |
 | Alignment: PreCut | Admit eligible pre-cut candidates, preserve started prefix and sort pending work, reconcile finalized input |
 | Alignment: Baton | The same local scheduling foundation plus intended-order reports, bounded direction selection and advisory handling |

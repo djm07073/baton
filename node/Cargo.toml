@@ -1,11 +1,11 @@
 [package]
-name = "baton-network"
+name = "baton-node"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
 repository.workspace = true
-description = "Baton network configuration, assembly and runtime supervision"
+description = "Baton node configuration, assembly and runtime supervision"
 readme = "README.md"
 
 [[bin]]

@@ -1,6 +1,6 @@
 # Baton docs: start here
 
-**Read [01. Architecture](01-overview/01-architecture.md) first.** It shows how Network assembles the existing Multimmit Engine/Marshal with Execution, TxPool, Alignment and Storage. Execution implements the native application callbacks and owns coordination.
+**Read [01. Architecture](01-overview/01-architecture.md) first.** It shows how Node assembles the existing Multimmit Engine/Marshal with Execution, TxPool, Alignment and Storage. Execution implements the native application callbacks and owns coordination.
 
 For implementation, start with [developer assignments](03-reference/07-development-order.md#developer-assignments). Source `todo!()` markers identify owned work, required behavior and completion tests; the scaffold does not implement those contracts yet.
 
@@ -23,11 +23,11 @@ Start with the picture on each page. E2E pages show a short path first; expand t
 Start with `01-overview`, read the crate READMEs, then follow `02-e2e`. Keep `03-reference` nearby for exact contracts and implementation assignments. Component details live with their source crate, without another copy in this directory.
 
 1. **`01-overview/` — understand the whole composition.** Read [Architecture](01-overview/01-architecture.md), then [terminology](01-overview/02-terminology.md) for the values passed between components.
-2. **Crate READMEs — understand each responsibility and exchange.** Start with [Multimmit](../network/README.md#multimmit) and follow the [component contents](SUMMARY.md): communication partners, inputs, outputs and completion conditions.
+2. **Crate READMEs — understand each responsibility and exchange.** Start with [Multimmit](../node/README.md#multimmit) and follow the [component contents](SUMMARY.md): communication partners, inputs, outputs and completion conditions.
 3. **`02-e2e/` — follow the complete flow.** Start with [Transaction to durable state](02-e2e/01-transaction-to-state.md). Files `02`–`09` expand individual paths and recovery.
 4. **`03-reference/` — look up details as needed.** Consult [communication contracts](03-reference/01-communication-contracts.md), Rust signatures, backend research and development checks from the component and E2E links.
 
-Read [Network](../network/README.md), [TxPool](../tx-pool/README.md), [Alignment](../alignment/README.md), [Execution](../execution/README.md) and [Storage](../storage/README.md) for their responsibilities and communication contracts. Once these responsibilities and exchanges are clear, continue to the first E2E page. Detailed type declarations can wait until you need them.
+Read [Node](../node/README.md), [TxPool](../tx-pool/README.md), [Alignment](../alignment/README.md), [Execution](../execution/README.md) and [Storage](../storage/README.md) for their responsibilities and communication contracts. Once these responsibilities and exchanges are clear, continue to the first E2E page. Detailed type declarations can wait until you need them.
 
 The [full contents](SUMMARY.md) and site's previous/next links use this same order. `assets/` contains diagram renders and the generated Rust export; it is not a reading chapter.
 

@@ -71,7 +71,7 @@ Alignment owns eligible candidates and pending scheduling policy. It preserves s
 | Execution dispatch → policy | Public `AlignmentPolicy::next(view)` → `Option<JobIntent>` | A proposed block/parent pair or no eligible work; resources remain unclaimed |
 | Peer Apps ↔ Baton policy | Window announcement, signed reports and signed direction | Authenticated scheduling information; no ordering finality or execution certificate |
 
-The [shared Alignment contract](../docs/03-reference/01-communication-contracts.md#proposed-alignment-interface) defines method results, view contents and invariants. The [message catalog](../network/README.md#networking-messages-used-in-diagrams) describes peer content. PreCutAlignment and BatonAlignment share the traits; Baton-specific report/planning functions remain private.
+The [shared Alignment contract](../docs/03-reference/01-communication-contracts.md#proposed-alignment-interface) defines method results, view contents and invariants. The [message catalog](../node/README.md#networking-messages-used-in-diagrams) describes peer content. PreCutAlignment and BatonAlignment share the traits; Baton-specific report/planning functions remain private.
 
 <a id="alignment-shared-application-state-and-different-scheduling-policy"></a>
 
@@ -83,7 +83,7 @@ The [shared Alignment contract](../docs/03-reference/01-communication-contracts.
 | Valid predecessor checkpoint and free worker | Dispatch next eligible block | Dispatch under the applicable local/advisory policy |
 | Worker completion | Execution retains effects/checkpoints and rejects stale completions; policy reads the refreshed view | Same refreshed view, also usable for future intentions |
 | Marshal `Update(index, block, ACK)` | Reconcile exact canonical order; reuse/repair; durably apply; ACK | Identical canonical authority; reports never gate it |
-| Intended-order reports / direction | Absent; no Baton instance | Authenticate, admit and choose inside Baton policy; use Network transport |
+| Intended-order reports / direction | Absent; no Baton instance | Authenticate, admit and choose inside Baton policy; use Node transport |
 | Change to native cut policy | None | Required for full protected-prefix research objective; still open |
 
 A scheduler chooses **what to start next**. It does not duplicate Marshal's history verifier, body resolver, dense order or delivery cursor. It also does not own a second canonical writer. Execution supplies read-only checkpoint/resource projections through SchedulingView; Alignment returns intent without acquiring execution handles.

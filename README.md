@@ -7,14 +7,14 @@ Start with [developer assignments](docs/03-reference/07-development-order.md#dev
 
 | Crate | Responsibility and specification |
 |---|---|
-| [network](network/README.md) | Native network/Marshal assembly, configuration and runtime supervision |
+| [node](node/README.md) | Native network/Marshal assembly, configuration and runtime supervision |
 | [tx-pool](tx-pool/README.md) | Transaction admission, retained selection, payload codec and durable maintenance |
 | [alignment](alignment/README.md) | Pre-cut/Baton policies; qualified candidates, ordering and next-job selection |
 | [execution](execution/README.md) | Native callbacks, coordination, execution, checkpoints, certification and ACK |
 | [storage](storage/README.md) | Pinned reads, roots, certified persistence, import material and recovery |
 | [docs](docs/README.md) | Reading order, architecture, E2E flows, shared references and research history |
 
-The root is a virtual Cargo workspace. Network assembles the runtime; Execution imports TxPool and Alignment; Storage implements the Execution-owned storage contract. Execution is generic over that contract and never imports the concrete Storage backend. TxPool and Alignment define their own input projections without depending on Execution. There is one canonical README per crate, linked from the [contents](docs/SUMMARY.md).
+The root is a virtual Cargo workspace. Node assembles the runtime; Execution imports TxPool and Alignment; Storage implements the Execution-owned storage contract. Execution is generic over that contract and never imports the concrete Storage backend. TxPool and Alignment define their own input projections without depending on Execution. There is one canonical README per crate, linked from the [contents](docs/SUMMARY.md).
 
 ## Validate a change
 
@@ -22,7 +22,7 @@ Use Rust 1.96+, nightly rustfmt, Node.js 20+, Python 3 and optionally `just`:
 
 ```sh
 rustup component add rustfmt --toolchain nightly
-find network/src tx-pool/src alignment/src execution/src storage/src -name '*.rs' -type f -print0 | xargs -0 rustfmt +nightly --edition 2024 --check
+find node/src tx-pool/src alignment/src execution/src storage/src -name '*.rs' -type f -print0 | xargs -0 rustfmt +nightly --edition 2024 --check
 cargo check --workspace --all-targets --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
 python3 scripts/check_scaffold.py

@@ -93,7 +93,7 @@ Built-in peer ingress admits inside the actor, so it does not automatically call
 
 ## Tx P2P connection
 
-Use existing Commonware authenticated P2P connections, with a logical tx channel separate from native consensus messages. Do not assume dedicated physical connections for transactions. Transaction floods compete with report, body, and native processing; concrete quotas, queues, and runtime placement remain open, as described in [P2P message planes](../../network/README.md#networking-p2p-connections-and-message-planes).
+Use existing Commonware authenticated P2P connections, with a logical tx channel separate from native consensus messages. Do not assume dedicated physical connections for transactions. Transaction floods compete with report, body, and native processing; concrete quotas, queues, and runtime placement remain open, as described in [P2P message planes](../../node/README.md#networking-p2p-connections-and-message-planes).
 
 Use the selected chain backend's transaction transport when its complete workload/network is adopted. Constantinople's inspected ingress is HTTP with a separate HTTP relayer; it does not supply generic Commonware peer tx gossip. A generic Baton transport can reuse Commonware buffered broadcast and resolver on the existing authenticated channels. Their digest cache/fetch services replace generic propagation/cache/retry machinery, but do not choose unknown-tx inventory, admission identity or canonical cleanup. [Constantinople ingress](https://github.com/commonwarexyz/constantinople/blob/3b6c92e76bf582855615844a4175b8304808f6a9/crates/mempool/src/webserver/actor.rs#L718), [HTTP relayer](https://github.com/commonwarexyz/constantinople/blob/3b6c92e76bf582855615844a4175b8304808f6a9/bin/validator/src/relayer.rs#L455).
 
@@ -122,7 +122,7 @@ For an Ethereum-compatible backend, reuse existing Reth maintenance rather than 
 
 ## Commonware primitives in the transaction layer
 
-**The TxPool owns admission and selection; Commonware supplies networking, encoding and storage building blocks.** Validate and retain transactions by type inside the pool, and share all retained types through Network. Proposal selection resolves eligible type pools from the epoch/lane before packing ready transactions. Canonical maintenance stays internal; no new public trait is required.
+**The TxPool owns admission and selection; Commonware supplies networking, encoding and storage building blocks.** Validate and retain transactions by type inside the pool, and share all retained types through Node. Proposal selection resolves eligible type pools from the epoch/lane before packing ready transactions. Canonical maintenance stays internal; no new public trait is required.
 
 | Primitive | Where it connects | Application responsibility |
 |---|---|---|

@@ -1,6 +1,6 @@
 {
   "specification": "Baton docs Mermaid sources",
-  "specification_sha256": "b2fb52eb62c7e48f462ede7eb9df9460e481e16414420e460e31dd234dd65156",
+  "specification_sha256": "6d48655ddaba2824ddf68d748d307e2eb10c940820f4fe0c621a268ae0997f7d",
   "renderer": "mermaid 11.12.0",
   "diagrams": [
     {
@@ -8,7 +8,7 @@
       "title": "Application composition",
       "width": 875,
       "height": 1060,
-      "source_sha256": "43314faf1f019516034efa3094309da80536556b664c0b0fc0930ac0fe600dbb"
+      "source_sha256": "97cc9e4e4707dfdd8ab20fc6a33f764ae107dd8ed0ca8dd2e3f5ff6f7168b449"
     },
     {
       "name": "diagram-02",
@@ -21,8 +21,8 @@
       "name": "diagram-03",
       "title": "Tx lifecycle: new, duplicate, and invalid transactions",
       "width": 1338,
-      "height": 2292,
-      "source_sha256": "6ec762ab2ee1f3c04fcd428384c615acf843357217bbce8029362eab4af7003e"
+      "height": 2295,
+      "source_sha256": "a76986e6ca7e6e02fe1387ddc652bc745d5b28349ea1a853d7909cd3d5da4d42"
     },
     {
       "name": "diagram-04",

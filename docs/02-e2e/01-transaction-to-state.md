@@ -122,9 +122,9 @@ Marshal already delivers the ordinary native total order. The App reconciles ret
 ```mermaid
 sequenceDiagram
     participant C as Client / tx peer
-    participant A as Execution / Network ingress
+    participant A as Execution / Node ingress
     participant P as Local TxPool
-    participant Q as Peer Network / TxPool
+    participant Q as Peer Node / TxPool
     participant N as Multimmit Engine
     participant W as Execution canonical owner
     C->>A: wire: Transaction(tx)

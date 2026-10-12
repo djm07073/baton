@@ -22,7 +22,7 @@ flowchart TB
 
 Header and body use separate paths. Their arrival order is independent; the receiver resolves them using the exact BlockRef.
 
-Read after [Marshal custody](../../network/README.md#marshal-custody) and [App callbacks](../../execution/README.md#coordination). This case follows `stage_block`, `Relay::broadcast`, `subscribe_block/fetch_block` and the verification reply through timing, completion and failure paths.
+Read after [Marshal custody](../../node/README.md#marshal-custody) and [App callbacks](../../execution/README.md#coordination). This case follows `stage_block`, `Relay::broadcast`, `subscribe_block/fetch_block` and the verification reply through timing, completion and failure paths.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../03-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
 
@@ -73,7 +73,7 @@ sequenceDiagram
 
 `stage_block().await` returns a `Custody` token after admission of storage work. Awaiting `Custody::wait()` establishes durable recovery; `put_block()` combines staging and that wait. Dropping the token does not cancel accepted storage work. The local native custody verify provides the required gate before header signing. An App may wait earlier in propose, but need not add a second durability path. [Marshal mailbox](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/marshal/mailbox.rs#L327)
 
-The body digest commits to the payload. The header digest identifies the native producer block, including its producer Context and body digest. `propose` returns the body digest; native `Relay::broadcast` requests propagation using the header digest. The existing Marshal Relay resolves that digest to the staged complete block. Its local Feedback does not prove remote receipt or custody, and even `Ok` can mean no matching staged block was found. [Relay completion](../../network/README.md#networking)
+The body digest commits to the payload. The header digest identifies the native producer block, including its producer Context and body digest. `propose` returns the body digest; native `Relay::broadcast` requests propagation using the header digest. The existing Marshal Relay resolves that digest to the staged complete block. Its local Feedback does not prove remote receipt or custody, and even `Ok` can mean no matching staged block was found. [Relay completion](../../node/README.md#networking)
 
 ## Body lookup, verification, and missing-content handling
 

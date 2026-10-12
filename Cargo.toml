@@ -1,6 +1,6 @@
 # Independently buildable, including when checked out as a submodule.
 [workspace]
-members = ["network", "tx-pool", "alignment", "execution", "storage"]
+members = ["node", "tx-pool", "alignment", "execution", "storage"]
 resolver = "2"
 
 [workspace.package]

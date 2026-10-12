@@ -1,6 +1,6 @@
-# Network
+# Node
 
-`baton-network` is the runtime-owning binary (`baton`). It configures and assembles `baton-tx-pool`, `baton-alignment`, `baton-execution`, `baton-storage` and the existing Commonware Engine/Marshal/network graph.
+`baton-node` is the runtime-owning binary (`baton`). It configures and assembles `baton-tx-pool`, `baton-alignment`, `baton-execution`, `baton-storage` and the existing Commonware Engine/Marshal/network graph.
 
 ## Responsibilities and state
 
@@ -15,11 +15,11 @@ Own configuration, construction, service lifetimes, startup readiness and superv
 | Multimmit | `Engine::open`, `Engine::start` | Recover native state, then start consensus after custody can be served |
 | Native networking | Existing Sender/Receiver channels | Separate native planes from App result/report traffic |
 
-Follow the [assembly sequence](../docs/03-reference/07-development-order.md#body-assembly-to-implement) and [startup/recovery E2E](../docs/02-e2e/09-startup-and-recovery.md). Construction parameters, backend/runtime policy and supervision remain NETWORK-01 work; `main` deliberately stops at `todo!()` until that contract is implemented.
+Follow the [assembly sequence](../docs/03-reference/07-development-order.md#body-assembly-to-implement) and [startup/recovery E2E](../docs/02-e2e/09-startup-and-recovery.md). Construction parameters, backend/runtime policy and supervision remain NODE-01 work; `main` deliberately stops at `todo!()` until that contract is implemented.
 
-Network derives `LaneContext` from the trusted native epoch/producer configuration and the agreed routing rule, then constructs the pool with `TxPool::open(lanes)`. Supply the same context to proposal handling. Admission retains valid transactions by type independently of local proposal eligibility; all retained types remain available for sharing.
+Node derives `LaneContext` from the trusted native epoch/producer configuration and the agreed routing rule, then constructs the pool with `TxPool::open(lanes)`. Supply the same context to proposal handling. Admission retains valid transactions by type independently of local proposal eligibility; all retained types remain available for sharing.
 
-Native lane identity does not define transaction types. POOL-01 owns the epoch/lane-to-type selection policy; NETWORK-01 supplies its agreed configuration and epoch transitions. Type buckets and indexes remain internal to TxPool; see [lane context and sharing](../tx-pool/README.md#pool-lane-context-and-sharing).
+Native lane identity does not define transaction types. POOL-01 owns the epoch/lane-to-type selection policy; NODE-01 supplies its agreed configuration and epoch transitions. Type buckets and indexes remain internal to TxPool; see [lane context and sharing](../tx-pool/README.md#pool-lane-context-and-sharing).
 
 ## Implementation tasks and completion
 
@@ -27,7 +27,7 @@ Native lane identity does not define transaction types. POOL-01 owns the epoch/l
 
 | Task | Required work and acceptance criteria |
 |---|---|
-| <a id="network-01"></a>NETWORK-01 | [Supervised assembly, readiness and shutdown](../docs/03-reference/07-development-order.md#network-01) |
+| <a id="node-01"></a>NODE-01 | [Supervised assembly, readiness and shutdown](../docs/03-reference/07-development-order.md#node-01) |
 
 Verify with focused deterministic tests after implementation, plus the [workspace checks](../README.md#validate-a-change). Compilation and documentation checks do not prove protocol behavior.
 
@@ -46,7 +46,7 @@ Verify with focused deterministic tests after implementation, plus the [workspac
 
 <a id="multimmit-consensus-roles-and-native-structure"></a>
 
-**Connect Execution to the existing Multimmit Engine and Multimmit Marshal.** Engine owns producer lanes, DA, voting and finality. Marshal owns complete block custody, history/body backfill, canonical ordering and delivery. Network injects the separate TxPool, Alignment and Storage implementations into Execution.
+**Connect Execution to the existing Multimmit Engine and Multimmit Marshal.** Engine owns producer lanes, DA, voting and finality. Marshal owns complete block custody, history/body backfill, canonical ordering and delivery. Node injects the separate TxPool, Alignment and Storage implementations into Execution.
 
 This page follows the current parent checkout at [6233438985d8249d2b2bc1204191d5d405652288](https://github.com/0xEyrie/monorepo/tree/6233438985d8249d2b2bc1204191d5d405652288). The earlier `534af0...` research pin predates this Marshal implementation. See [source status](../docs/03-reference/09-sources.md).
 

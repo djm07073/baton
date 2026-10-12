@@ -12,7 +12,7 @@ The term **App** in native contracts and E2E diagrams denotes this Execution's C
 
 | Partner | Interface | Completion means |
 |---|---|---|
-| Network assembly | `Execution::open(pool, alignment, storage); Execution::start(mailbox)` | Create retained callback/Update ownership in recovering state |
+| Node assembly | `Execution::open(pool, alignment, storage); Execution::start(mailbox)` | Create retained callback/Update ownership in recovering state |
 | Multimmit | `Automaton::propose`, `Automaton::verify` | Staged payload digest or valid payload/durable-custody verdict; no execution wait |
 | Marshal | `Reporter::report(Update)` and existing Mailbox methods | Retain exact ordering/tokens, use native block custody and ACK only covered certified state |
 | TxPool | `admit`, `select`, `reconcile` | Bounded transaction intake/selection or durable-outcome maintenance |
@@ -125,7 +125,7 @@ Pre-cut and Baton share the same execution, certification and storage path. Pre-
 
 The flows below expand each callback’s ownership, waits and failure paths. The [Rust reference](../docs/03-reference/02-rust-signatures.md) contains existing signatures. The [communication reference](../docs/03-reference/01-communication-contracts.md) defines exact values and completion/failure contracts. **[C]** is existing Commonware, **[P]** a proposed contract, **[A]** private App behavior and **[X]** unfinished native work. These names identify responsibilities rather than requiring one public trait per connection.
 
-Use Marshal's existing `Relay` implementation. Its broadcast key is the **full header/block digest**, which locates the staged full block; this differs from the body digest returned by `propose` and passed to `verify`. The native wire carries signed headers separately from the Marshal body broadcast. A receiver may therefore have the header before the body. [Body flow](../network/README.md#marshal-custody) explains these identities and custody stages.
+Use Marshal's existing `Relay` implementation. Its broadcast key is the **full header/block digest**, which locates the staged full block; this differs from the body digest returned by `propose` and passed to `verify`. The native wire carries signed headers separately from the Marshal body broadcast. A receiver may therefore have the header before the body. [Body flow](../node/README.md#marshal-custody) explains these identities and custody stages.
 
 `Reporter` has an associated `Activity` type. One concrete Rust type cannot implement it twice with two different associated types. Give the same Execution owner two small typed handles if it needs both native observations and Marshal deliveries. This is ordinary mailbox wiring, not another service layer.
 
@@ -229,7 +229,7 @@ flowchart TB
 
 **`true` means valid payload and durable custody.** Admission only updates pending candidate state. [Later dispatch](#coordination-dispatch-after-verification) waits for the exact execution parent and resources; the verdict does not wait for transaction execution, result roots, reports or directions.
 
-The actual `verify` future returns `oneshot::Receiver<bool>`; App later sends the verdict through the paired sender. `false` means permanent invalidity, not “body has not arrived,” “worker busy” or “speculation failed.” A canceled request stops its pending job; custody failure cannot become `true`, and mutable-store failure requires recovery of that instance. See [the body API guide](../network/README.md#marshal-custody-use-marshals-existing-body-apis) for the fetch-first custody path and superseded subscription handling.
+The actual `verify` future returns `oneshot::Receiver<bool>`; App later sends the verdict through the paired sender. `false` means permanent invalidity, not “body has not arrived,” “worker busy” or “speculation failed.” A canceled request stops its pending job; custody failure cannot become `true`, and mutable-store failure requires recovery of that instance. See [the body API guide](../node/README.md#marshal-custody-use-marshals-existing-body-apis) for the fetch-first custody path and superseded subscription handling.
 
 The shared Automaton documentation describes single-shot verification and terminal closure. Current Multimmit's remote chain plane has a narrower implementation exception: a closed receiver becomes `Unavailable`, eligibility returns to `Ready`, and verification can be dispatched again within the same run. Local uncanceled custody failure is fatal; recovery also requires `true`. Do not rely on closure as a portable retry mechanism, and deduplicate repeated live calls as well as recovery. [Remote dispatch](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/actors/voter/chain_plane.rs#L522), [eligibility transition](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/consensus/src/multimmit/machine/eligibility.rs#L352).
 
@@ -317,7 +317,7 @@ Result certification precedes canonical application for both direct and imported
 
 ### Assemble before opening the engine
 
-Network first calls `Execution::open(pool, alignment, storage)` to create retained Update ingress. Pass its clone as the Reporter to `Service::start`, then give the returned Mailbox to `Execution::start`. Early Updates remain retained while the mailbox is unattached; body work starts after attachment. This two-step construction follows the native service dependency and does not add a forwarding layer. Keep speculation gated until recovery and native readiness finish.
+Node first calls `Execution::open(pool, alignment, storage)` to create retained Update ingress. Pass its clone as the Reporter to `Service::start`, then give the returned Mailbox to `Execution::start`. Early Updates remain retained while the mailbox is unattached; body work starts after attachment. This two-step construction follows the native service dependency and does not add a forwarding layer. Keep speculation gated until recovery and native readiness finish.
 
 Restore App's canonical state/applied binding, or initialize the agreed App genesis; Marshal's index 0 is genesis and is never delivered as an Update. Use the [existing assembly](../docs/03-reference/07-development-order.md#body-assembly-to-implement), with App custody and retained Update intake available before `Engine::open` invokes recovery verification. Gate speculative dispatch during recovery, not the custody answers needed to finish open.
 
@@ -331,7 +331,7 @@ Keep failed startup, sibling-service lifetimes and shutdown under the [existing 
 
 ### Native activities and optional local notifications
 
-Route native `Activity` directly to Marshal through its [existing mailbox reporter](../network/README.md#multimmit-native-activities). App may additionally consume `TransactionProposed`, `ProtocolAccepted`, finality or history observations for candidate correlation and advisory scheduling. These are best-effort, idempotent hints; App must not build a second finality/delivery engine from them.
+Route native `Activity` directly to Marshal through its [existing mailbox reporter](../node/README.md#multimmit-native-activities). App may additionally consume `TransactionProposed`, `ProtocolAccepted`, finality or history observations for candidate correlation and advisory scheduling. These are best-effort, idempotent hints; App must not build a second finality/delivery engine from them.
 
 Shared execution progress is ordinary App state: after canonical apply, remove applied pending entries and rebase/fence conflicting speculative work without calling `Alignment::commit` again. Applied-progress coordination adds no extra ACK protocol or scheduler approval. Result signatures, certificates and state-sync material travel directly between peer application execution components; Baton report collection is outside that path.
 
@@ -555,7 +555,7 @@ Result processing stays inside Execution. State import uses the existing Storage
 | Execution owner → Execution | `execution.install_checkpoint(applied.checkpoint)` | Adopt a usable durable base, skip covered work and retire conflicts |
 | Execution owner → Marshal | `update.acknowledgement.acknowledge()` | Exactly covered delivery acknowledged after certified App durability |
 
-`results.sign(statement, direct_evidence)` and `results.accept(evidence, canonical_context)` are local private helpers behind those exchanges. `Storage::verify_material` belongs to the injected Storage contract and `execution.install_checkpoint` to Execution; execution and result helpers remain private; import/recovery use the Storage trait. Peer messages are logical content with open codecs. See the [detailed result contract](../docs/03-reference/01-communication-contracts.md#private-result-import-and-lifecycle-calls) and [message catalog](../network/README.md#networking-messages-used-in-diagrams).
+`results.sign(statement, direct_evidence)` and `results.accept(evidence, canonical_context)` are local private helpers behind those exchanges. `Storage::verify_material` belongs to the injected Storage contract and `execution.install_checkpoint` to Execution; execution and result helpers remain private; import/recovery use the Storage trait. Peer messages are logical content with open codecs. See the [detailed result contract](../docs/03-reference/01-communication-contracts.md#private-result-import-and-lifecycle-calls) and [message catalog](../node/README.md#networking-messages-used-in-diagrams).
 
 <a id="certification-interface-overview"></a>
 <a id="certification-internal-execution-and-apply-flow"></a>

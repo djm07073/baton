@@ -21,13 +21,13 @@ The diagram groups native protocol phases; the detailed sequence below shows the
 
 <a id="normal-native-consensus-producer-da--leader-proposal--finality"></a>
 
-Read after [Multimmit](../../network/README.md#multimmit) and [Marshal delivery](../../network/README.md#marshal-delivery). This case follows Automaton, native Activity and the final Update handoff through timing, completion and failure paths.
+Read after [Multimmit](../../node/README.md#multimmit) and [Marshal delivery](../../node/README.md#marshal-delivery). This case follows Automaton, native Activity and the final Update handoff through timing, completion and failure paths.
 
 Diagram labels: **[C]** existing Commonware interface; **[A]** App-owned processing; **[P]** proposed App trait; **[X]** required native extension; **wire** peer message. See the [interface map](../03-reference/01-communication-contracts.md#diagram-notation) for contracts and implementation ownership.
 
 ## Native producer, DA and view/finality paths
 
-This diagram highlights the App connections. Native protocol details remain in the [consensus source map](../../network/README.md#multimmit).
+This diagram highlights the App connections. Native protocol details remain in the [consensus source map](../../node/README.md#multimmit).
 
 <details>
 <summary>Detailed interface sequence</summary>

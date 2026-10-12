@@ -1,5 +1,5 @@
 flowchart TB
-    W["network crate<br/>assembly and service lifetime"] -->|"[C] Engine::open / start<br/>marshal::open / Service::start"| N["Multimmit Engine + Marshal"]
+    W["node crate<br/>assembly and service lifetime"] -->|"[C] Engine::open / start<br/>marshal::open / Service::start"| N["Multimmit Engine + Marshal"]
     W -->|"[A] Execution::open / start<br/>pool, alignment, storage, mailbox"| E
     N <-->|"[C] Automaton::propose / verify<br/>Reporter::report(Update)<br/>Mailbox custody / ACK"| E["execution crate<br/>callbacks, coordination, execution<br/>checkpoints and result certification"]
     E <-->|"[A] TxPool::admit / select / reconcile"| P["tx-pool crate<br/>retained transactions and payloads"]

@@ -17,7 +17,7 @@ pub trait AlignmentPolicy: Alignment + Send + 'static {
     fn next(&self, view: &SchedulingView<'_>) -> Option<JobIntent>;
 }
 
-/// Scheduling mode selected during Network assembly.
+/// Scheduling mode selected during Node assembly.
 #[derive(Clone, Copy)]
 pub enum AlignmentMode {
     /// Speculation with native ordering and no Baton traffic.

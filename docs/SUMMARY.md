@@ -9,7 +9,7 @@
 
 ## Crates: responsibilities and communication
 
-* [Network: Multimmit, Marshal and assembly](../network/README.md)
+* [Node: Multimmit, Marshal and assembly](../node/README.md)
 * [TxPool: admission, selection and payload](../tx-pool/README.md)
 * [Alignment: Pre-cut and Baton](../alignment/README.md)
 * [Execution: callbacks, execution and certification](../execution/README.md)

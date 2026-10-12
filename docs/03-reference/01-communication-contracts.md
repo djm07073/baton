@@ -37,14 +37,14 @@ Using a supplied alignment implementation does not require reimplementing its tr
 | Responsibility | Owns | Calls / completion |
 |---|---|---|
 | **Consensus** | Multimmit producer lanes, DA, proposals, votes and native finality | Calls the existing Automaton; publishes native activity to Marshal |
-| **Network** | Native transport, service construction and supervised lifetimes | Constructs and connects Marshal, Execution, pool, policy and backend |
+| **Node** | Native transport, service construction and supervised lifetimes | Constructs and connects Marshal, Execution, pool, policy and backend |
 | **TxPool** | Transaction admission/selection, retained bytes and payload codec | Consumes SelectionContext/PoolUpdate projected by Execution |
 | **Alignment** | PreCut/Baton candidate and report/direction policy | `admit`, ordering-only `commit`, and `next` over a read-only execution projection |
 | **Execution** | Native callbacks, retained delivery tokens, lifecycle, dispatch, transaction execution, checkpoints and result certification | Implements Automaton/Reporter, projects pool/policy inputs, requests Storage work and ACKs exactly covered certified durability |
 | **Storage** | Roots/material, canonical persistence, pinned views, import and recovery | Implements the Execution-owned read/submit/commit/verify_material/recover contract and emits retained events |
 | **Existing Marshal** | Full-block custody, relay/backfill, native history interpretation and ordered delivery | Provides Mailbox/Relay interfaces and reports indexed Updates to Execution |
 
-App in Commonware/E2E notation means the application role implemented by Execution. Its coordination, execution and results are internal responsibilities, not an extra App crate or callback-forwarding layer. Native `multimmit::AppExecutor` is Commonware's callback runner, distinct from Baton Execution. Network injects the pool, selected Alignment policy and Storage implementation through `Execution::open`.
+App in Commonware/E2E notation means the application role implemented by Execution. Its coordination, execution and results are internal responsibilities, not an extra App crate or callback-forwarding layer. Native `multimmit::AppExecutor` is Commonware's callback runner, distinct from Baton Execution. Node injects the pool, selected Alignment policy and Storage implementation through `Execution::open`.
 
 ## Proposed Alignment interface
 
@@ -70,7 +70,7 @@ pub struct BatonAlignment { /* ... */ }
 |---|---|
 | `pub trait Alignment` | External calls into alignment: candidate admission and finalized-order notification |
 | `pub trait AlignmentPolicy: Alignment` | Execution dispatch shared by PreCut and Baton: choose the next execution intent |
-| `pub struct PreCutAlignment`, `BatonAlignment` | Concrete policies in baton-alignment, selected by Network assembly |
+| `pub struct PreCutAlignment`, `BatonAlignment` | Concrete policies in baton-alignment, selected by Node assembly |
 
 `Alignment`, `AlignmentPolicy`, concrete policy types and their input/output values are publicly reachable from `baton-alignment`. Execution constructs read-only views and calls them across crates; fields and policy helpers remain private. `SchedulingView` contains an `OrderedView` and an `ExecutionView` projection, never an Execution handle or a second mutable checkpoint tree. The placeholder fields still require MODEL-01 implementation.
 
@@ -228,7 +228,7 @@ Read a method-call arrow as **caller → owner: operation(inputs)** and its retu
 
 Solid versus dashed sequence arrows distinguish calls from returns/notifications, not durability. Only the stated completion contract establishes durability. Overview flowcharts may group methods and omit arguments; their named methods map to the same contracts as the detailed sequence diagrams. Receiver-local names such as `stage_block`, `engine.start` and `barrier.durable` refer to the documented Mailbox, Engine and Barrier methods. Generic arguments and some configuration fields are omitted for readability; use the Rust reference and source for compilable signatures. `Receiver<T>` is returned by the async Automaton callback; `reply.send(value)` later resolves it. Returning the receiver and sending the verdict are different events.
 
-A label describing internal behavior or a data dependency is not an additional Rust method. `[A]` calls are documented concrete App helpers, with implementation signatures left private. A coalesced dispatch wakeup is an internal notification with no required named event type. `[X]` hooks are explicitly unresolved native obligations, not implementable SDK signatures. `wire:` App message names describe logical content; their codecs remain open. The [message catalog](../../network/README.md#networking-messages-used-in-diagrams) records those distinctions. Do not interpret all arrows as public trait methods.
+A label describing internal behavior or a data dependency is not an additional Rust method. `[A]` calls are documented concrete App helpers, with implementation signatures left private. A coalesced dispatch wakeup is an internal notification with no required named event type. `[X]` hooks are explicitly unresolved native obligations, not implementable SDK signatures. `wire:` App message names describe logical content; their codecs remain open. The [message catalog](../../node/README.md#networking-messages-used-in-diagrams) records those distinctions. Do not interpret all arrows as public trait methods.
 
 The practical implementation split is:
 
@@ -289,7 +289,7 @@ These rows explain behavior and completion behind the diagrams. Helper names are
 
 | Proposed call | Owner and return | Completion, waiting and failure contract |
 |---|---|---|
-| `TxPool::open(lanes)` | Network → TxPool | Inject trusted LaneContext; keep local assignment and shared routing independent of Execution/Storage internals. |
+| `TxPool::open(lanes)` | Node → TxPool | Inject trusted LaneContext; keep local assignment and shared routing independent of Execution/Storage internals. |
 | `pool.admit(tx)` | TxPool → `Result<Admission, AdmissionError>` | Validate, deduplicate and retain by type for sharing regardless of local proposal eligibility. Success carries duplicate metadata; failures distinguish Invalid from retryable Backpressure. |
 | `pool.select(ctx, limits)` | TxPool → `Payload` | Called from Automaton::propose handling. Resolve eligible type pools for the matching epoch/lane, pack ready transactions within limits and preserve retention. |
 | `pool.reconcile(applied_outcomes)` | TxPool maintenance | Reconcile all type pools from durable outcomes across all lanes; schedule after publication without another ACK approval. |
@@ -340,8 +340,8 @@ These four names describe obligations, not an approved hook API. Proposal encodi
 | `results.sign(prepared, direct_evidence)` | Execution result code → attestation | Bind irrevocable exact input/base/runtime/result and verified direct execution. Imported work cannot become an own direct signature. |
 | `results.accept(evidence, canonical_context)` | Execution result code → `VerifiedCertificate`, pending or invalid | Verify full subjects and `f+1` distinct eligible signers independently of native ordering QC membership. Incomplete/missing context stays pending. |
 | `Storage::verify_material(verified, material, base)` | Storage → `PreparedImport`, pending or invalid | Verify exact applicability and retain candidate material inside Storage, keyed by its full certified target, before returning PreparedImport. Later `Storage::commit(verified)` resolves that same retained material and rechecks the base under the shared writer. Neither return grants writer authority nor justifies stopping direct work. This operation is part of the public Storage contract; it does not verify quorum evidence again. |
-| `Execution::open(pool, alignment, storage)` | Network assembly → Execution callback handle | Create retained Update/event ingress and wire dependencies before starting Marshal output. Storage recovery supplies the base separately; speculative lifecycle remains recovering. |
-| `Execution::start(mailbox.clone())` | Network assembly → running callback work | Make custody lookup and Update handling usable before `Engine::open`; recovery verify must be answerable. |
+| `Execution::open(pool, alignment, storage)` | Node assembly → Execution callback handle | Create retained Update/event ingress and wire dependencies before starting Marshal output. Storage recovery supplies the base separately; speculative lifecycle remains recovering. |
+| `Execution::start(mailbox.clone())` | Node assembly → running callback work | Make custody lookup and Update handling usable before `Engine::open`; recovery verify must be answerable. |
 | `app.activate(native_ready, recovered_base)` | Execution owner → live speculative lifecycle | Activate only after successful native readiness and consistent App recovery; failed startup does not dispatch speculation. |
 
 Follow [results](../02-e2e/07-result-certification.md), [state sync](../02-e2e/08-state-import.md) and [recovery](../02-e2e/09-startup-and-recovery.md) for the actual call ordering. These operations stay inside App; Baton planning does not gate them.

@@ -10,10 +10,10 @@ check: check-fmt clippy
 
 # Enumerate source files because stability_mod! hides modules from cargo fmt.
 fix-fmt:
-    find network/src tx-pool/src alignment/src execution/src storage/src -name '*.rs' -type f -print0 | xargs -0 {{rustfmt}} {{nightly_version}} --edition 2024
+    find node/src tx-pool/src alignment/src execution/src storage/src -name '*.rs' -type f -print0 | xargs -0 {{rustfmt}} {{nightly_version}} --edition 2024
 
 check-fmt:
-    find network/src tx-pool/src alignment/src execution/src storage/src -name '*.rs' -type f -print0 | xargs -0 {{rustfmt}} {{nightly_version}} --edition 2024 --check
+    find node/src tx-pool/src alignment/src execution/src storage/src -name '*.rs' -type f -print0 | xargs -0 {{rustfmt}} {{nightly_version}} --edition 2024 --check
 
 clippy:
     cargo clippy --workspace --all-targets --locked -- -D warnings

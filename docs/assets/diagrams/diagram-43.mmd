@@ -1,9 +1,9 @@
 flowchart TB
     A["External App callers"] -->|"[P] admit(candidate)<br/>commit(ordered)"| L["pub trait Alignment"]
-    D["App dispatch"] -->|"[P, internal] next(view)"| P["pub(crate) trait AlignmentPolicy"]
+    D["App dispatch"] -->|"[P] next(view)"| P["pub trait AlignmentPolicy"]
     P -->|"extends"| L
     P -->|"JobIntent"| D
-    D -->|"[A] claim + execution.execute"| E["Executor"]
+    D -->|"[A] claim + execution.execute"| E["Execution"]
     E -->|"[P] read / submit / commit"| S["pub trait Storage"]
     S -->|"[P] Prepared / Committed / Failed"| O["Retained App event routing"]
     O --> E

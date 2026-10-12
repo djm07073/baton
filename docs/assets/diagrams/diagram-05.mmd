@@ -1,8 +1,8 @@
 sequenceDiagram
     participant N as Multimmit Engine
-    participant A as Alignment layer / Automaton
+    participant A as Execution / Automaton
     participant M as Multimmit Marshal
-    participant E as App Executor / workers
+    participant E as Execution / execution workers
     N->>A: [C] Automaton::verify(ctx, body_digest).await
     A-->>N: Receiver[bool]
     A->>A: [C] ctx.header(body_digest) -> header

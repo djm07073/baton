@@ -1,8 +1,8 @@
 flowchart TB
-    P["Peer result"] --> V["Executor<br/>[A] results.accept"]
-    V --> M["Storage<br/>[A] state.verify_material"]
+    P["Peer result"] --> V["Execution<br/>[A] results.accept"]
+    V --> M["Storage<br/>[P] Storage::verify_material"]
     M -->|"verified and retained"| C["[P] Storage::commit(verified)<br/>single canonical writer"]
     C -->|"[P] Committed"| I["[A] execution.install_checkpoint<br/>skip covered work, retire conflicts"]
-    C -->|"[P] Committed"| A["App owner ACKs covered Updates"]
+    C -->|"[P] Committed"| A["Execution owner ACKs covered Updates"]
     V -->|"invalid / unresolved"| W["No import commit<br/>valid direct work can continue"]
     M -->|"missing / mismatch"| W

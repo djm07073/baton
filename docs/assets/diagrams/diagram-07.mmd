@@ -1,8 +1,8 @@
 sequenceDiagram
     participant L as Peer BatonAlignment
     participant B as Local BatonAlignment
-    participant A as Alignment internal dispatch / App owner
-    participant E as App Executor
+    participant A as Alignment internal dispatch / Execution owner
+    participant E as Execution / execution workers
     L-->>B: wire: SignedDirection(context, intended_order)
     B->>B: [A] Validate direction context and pending-order change
     alt Invalid or stale
@@ -12,7 +12,7 @@ sequenceDiagram
     else Permitted pending-order change
         B-->>A: [A] Coalesced dispatch wakeup, no payload
         A->>A: [A] app.dispatch_ready()
-        A->>B: [P] AlignmentPolicy::next(current_view), crate-internal
+        A->>B: [P] AlignmentPolicy::next(current_view), cross-crate
         B-->>A: JobIntent or None
         alt None
             Note over A: Wait for eligible input, ready parent or capacity

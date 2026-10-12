@@ -1,0 +1,232 @@
+# Baton — current research handoff
+
+Updated 2026-10-12. The newest decision below supersedes earlier architecture entries; those entries preserve research and publication history. Research/specification work only; no completed Baton native integration proof or application E2E results.
+
+## 2026-10-12 Implementation scaffold
+
+The repository is `djm07073/baton`. Rust source and TODO assignments live in `src/`; all research, paper and historical evidence live below `docs/research/`. Current specifications remain in the numbered docs folders. The [developer assignments](../03-reference/07-development-order.md#developer-assignments) define task ownership, inputs/outputs, invariants and acceptance tests. Compile-time interfaces and intentional TODO stubs are not working protocol behavior. Native source remains pinned to `6233438985d8249d2b2bc1204191d5d405652288`; unfinished policies and native prefix work remain open.
+
+## 2026-10-12 Executor certification and Storage commit
+
+Executor now owns signing, collecting and verifying f+1 matching execution-result evidence. Storage prepares the state root from retained StateChanges and sends Prepared to Executor. Executor binds that root to exact order/range, predecessor, runtime and result commitments, then requests Storage::commit(verified). Storage matches the verified subject to prepared material and the current predecessor, persists state plus original evidence and emits Committed. The proposed read/submit/commit contract replaces read/submit/certify. VerifiedCertificate is a local Executor-verifier output with restricted construction, not a wire object or persisted trust flag. Recovery reloads original evidence and has Executor reverify it before confirming the durable checkpoint; imports use the same verifier and writer. Result processing is an Executor responsibility, not a separate component. Execution through submit acceptance stays synchronized as recorded below. See [result certification](../../execution/README.md#certification) and the [Storage contract](../03-reference/01-communication-contracts.md#proposed-storage-interface).
+
+## 2026-10-12 Synchronous execution-to-Storage handoff
+
+The direct canonical worker awaits execution/reuse/repair of the complete ordered unit and then Storage::submit acceptance before completing the handoff or starting the next ordered unit. Pending/rejected submission retains retryable work; storage-instance failure requires recovery. This synchronizes execution through Storage retention, while root preparation, f+1 certification and physical flush remain later work. Native callbacks, independent speculation and Storage event intake continue to be serviced. The existing method/return arrows express the sequence; no Executor::flush method or new trait is added. See [Executor completion](../../execution/README.md#execution-execution-to-storage-completion) and [ordered submission](../03-reference/01-communication-contracts.md#ordered-progress-submission-and-batched-persistence).
+
+## 2026-10-11 Numbered documentation layout
+
+Start at [Architecture](../01-overview/01-architecture.md). The 32 subject pages now live under `docs/01-overview/`, `02-components/`, `02-e2e/` and `03-reference/`, with numbered filenames matching SUMMARY.md and site navigation. Read component responsibilities and communication before the first E2E flow; consult reference pages as needed. Certification and state import now precede startup/recovery in the E2E sequence. The root docs README is the single reading guide.
+
+Current contracts are in docs/03-reference/01-communication-contracts.md; native Rust excerpts are in docs/03-reference/02-rust-signatures.md; Storage is described in docs/02-components/08-storage.md. Local links, the compatibility entry point, Rust export tools and diagram source-page metadata follow the new paths. The original split map retains its section/provenance evidence with current destination paths. Historical review records and publication URLs retain their recorded scope and paths. All code fences, 19 Mermaid sources and 38 blank policy choices are preserved; this changes document navigation, not the design contracts.
+
+## 2026-10-11 Component reading order
+
+The current docs reading path is overview → component responsibilities and communication → E2E flows → reference/development. Component pages lead with ownership, communication direction, values and completion conditions. Executor, Storage and App result processing are described separately; the Storage page is docs/execution/storage.md. The detailed canonical contract remains docs/overview/interfaces.md, now a communication reference after E2E in navigation. Existing Rust declarations and backend surveys are reference material. SUMMARY.md, the start page and generated previous/next navigation use the same order. The documentation now has 33 content pages; all 19 Mermaid sources and the proposed trait contracts are unchanged by this readability edit.
+
+## 2026-10-11 Alignment interface and call flows
+
+Current documentation distinguishes Consensus, Alignment layer and App Executor. The last two remain inside App; existing Marshal supplies body custody, exchange and ordered delivery. `pub trait Alignment` exposes `admit` and `commit`; `pub(crate) trait AlignmentPolicy: Alignment` adds `next` for shared internal dispatch. Crate-visible `PreCutAlignment` and `BatonAlignment` implement both traits. `next` only selects a JobIntent; the App owner rechecks current execution context and claims resources before launch. The interface map defines SDK-style implementation requirements for application integrators and Alignment authors. Baton report collection and direction selection are described as behavior, with private method names and decomposition left to the implementation.
+
+The internal AlignmentPolicy trait supports shared dispatch without another runtime layer. `Alignment::commit(ordered)` records finalized ordering promptly without execution, certification or durability waits. Using a supplied policy does not require reimplementing its traits. `pub(crate)` permits same-crate implementation; third-party extension requires an explicitly public contract.
+
+The storage module is named `Storage`. Its proposed public `Storage: Send + Sync` contract exposes `read(view, key)`, `submit(executed, changes)` and `certify(certificate)`, with retained `StorageEvent::Prepared`, `Committed` and `Failed` events. Executor owns computation and in-memory checkpoints, reads memory/parent overlays before a pinned cold read, and hands over StateChanges with exact ordered execution metadata. App result handling signs prepared direct work and collects certificates. Storage independently validates matching f+1 evidence, order/material/predecessor and owns roots, writes, physical batching, imports and recovery. Submission/certificate acceptance is not durability. Only Committed carries a recoverable certified checkpoint and permits covered Update ACKs by the retained owner. Physical batching must preserve deterministic signed history and drain within delivery-window, idle and shutdown constraints.
+
+Executor installs the Committed checkpoint, skips covered queued work, retires conflicts and ignores stale completions. It preserves compatible descendants, and frees covered overlays/pinned views only after references and workers release them. Certified import/recovery uses the same handoff; imported work never produces an own direct-execution signature. No Executor installation ACK is required. Cold read errors never mean absent data or a switch to current state. Accepted-but-uncommitted work is replayed after recovery if lost; mutable-store failures stop that instance. The canonical detailed contract is docs/overview/interfaces.md. These are design documents, not implemented Rust APIs; existing native signatures, historical paper/reviews and external publication remain separate.
+
+## 2026-10-09 App-owned pool and schedulers
+
+The current reader design connects one App directly to existing Multimmit and its current Marshal at parent checkout `6233438985d8249d2b2bc1204191d5d405652288`. App owns the pool, Pre-cut or Baton scheduler, transaction workers and state backend. Existing Automaton propose/verify and Marshal Reporter<Update> are the integration surface. Required public TxPool/Baton/Executor/Storage traits and the proposed app-owned ordinary order-delivery machinery are removed. Marshal already supplies body custody/exchange, native order/history recovery and delivery ACK cursor.
+
+Verify registers usable speculative input after payload/custody checks without waiting for transaction execution. It also runs for local pre-sign custody and Engine::open recovery. Update is retained synchronously; app workers reuse/repair exact-parent work, durably apply, then ACK. Marshal's bounded delivery and cursor durability remain separate from native consensus progress and app state durability. State-sync floor changes require coordinating old retained Updates; no hidden Update generation field is assumed.
+
+Pending-only sorting, report rules, cut no-wait, result certification and direct/imported provenance remain. Full protected-prefix Baton still needs native proposal/policy validation and matching Marshal continuation/recovery changes; an app scheduler cannot reorder finalized Updates. Existing `534af0e` research remains historical source evidence. The paper and earlier publication receipts are preserved, and this local rewrite does not update GitBook or other external documents.
+
+The user requested three hours of iterative subagent simplification and source verification. [Current review record](assets/review/app-scheduler-20261009/README.md) tracks the work and completion status; the first rewrite is not a completed-window claim.
+
+## 2026-10-06 GitBook documentation update
+
+Published change request #17 (`eTFJaT4GhUXBQh5qg0G5`) as `yeCmkzCMDjJLNtSq9qKG`. Fresh immutable-revision readback verifies 40 pages: 32 content pages and eight section indexes, 601 links, 19 Mermaid diagrams, four public application traits and 98 preserved heading anchors. All five existing comment records/statuses are preserved. The separate [Pre-cut baseline](https://app.gitbook.com/s/pvyFEde12m2tVRjI8TRw/baselines/precut), admit/select simplification, Baton confirmed-order ownership, pending-only sorting and cut-proposal TODO are live. Twelve changed/new attachments were uploaded; raw remote bytes remain independently unverified. See [publication evidence](assets/review/baton-update-20261006/README.md). Baseline repair trigger and conflicting advisory direction policy remain open; this is documentation publication, not runtime implementation or benchmarking.
+
+## Separate Pre-cut baseline implementation
+
+The user requested a dedicated implementation section for a chain that speculates without Baton. docs/baselines/precut.md records its local attachment, real body/native assembly, pending-only global scheduling, confirmed-order delivery and incremental exact-parent reuse/repair. It shares Executor/Storage, certification/state sync and matched benchmark resources/endpoints with Baton, but has no report/direction or prefix-policy coordination. New continuous irrevocable input is the working repair trigger; repairing on unfinalized proposals remains awaiting clarification. Source export/base ordering and all runtime checks/benchmarks remain open or Not run. The local docs now contain 32 content pages and 19 diagrams; publication is separate.
+
+## Latest global-rule execution and report decision
+
+The user clarified that ordinary sorting affects only work not yet started. Preserve completed/current execution order F and dispatch/report F ++ sort_G(S_pending). A running with C then B admitted before C starts yields ABC; after C starts, late eligible B yields ACB without arrival-driven reexecution. Admission while the predecessor runs only sorts the queue; dispatch follows a valid checkpoint. Identical total inputs can yield different reports when local F differs. Reports remain intentions, not progress proofs. Native exact-order commit may still require repair; F is not canonical finality. Thresholds/deadlines/raw scoring/no-wait and original signed snapshots remain. Comparator/tie-break/encoding and conflicting advisory direction precedence remain open. Research §3.1 and current implementation pages record the clarification; no runtime implementation is claimed.
+
+## Latest Baton module decision
+
+The user merged the proposed Orderer role into Baton because it is new application integration rather than an existing Commonware module. There are four public application traits: TxPool, Baton, Executor and Storage. Baton on_finality admits native exact evidence/history; independent internal processing retains/verifies witnesses, reconstructs continuous irrevocable input, backfills gaps, calls Executor commit and records its durable completion for recovery/redelivery. No public record/next_range/acknowledge/recover actions are added. Native consensus retains voting/finality authority; advisory reports/planning/progress cannot gate confirmed delivery or Executor certification/state sync/Storage apply. Historical Orderer references below are superseded; native source-export and integration/proof work remain open.
+
+## Latest TxPool interface decision
+
+The public TxPool contract now has only `admit` and `select`. Admission validates RPC/peer transactions and uses internal static payload policy to retain selected candidates for local batch creation, retain unselected candidates for the chosen P2P policy, or drop invalid input. Selection reads selected candidates without canonical retirement. Selected/unselected are logical classes; physical backend/overlay, policy and retention details remain open. Static analysis/classification and canonical backend maintenance are internal, with no public analyze/classify/on_proposal/on_commit methods. This supersedes earlier TxPool method listings below. The six-hour review described in earlier entries is complete; this is a subsequent user interface correction.
+
+## 2026-10-04 Active six-hour Commonware reuse review
+
+The user requested six hours of repeated multi-agent investigation and review to maximize Commonware reuse in the current Baton GitBook, with actual Commonware-based chains as assembly references. The active window is 2026-10-03 19:29:14 UTC through 2026-10-04 01:29:14 UTC (2026-10-04 04:29:14–10:29:14 Asia/Seoul). Current requirements and wave evidence are tracked in [the reuse review](assets/review/commonware-reuse-20261004/README.md). This is ongoing, not a completion report.
+
+Latest conversation decisions supersede the previous five-trait/storage ownership wording below: Executor produces execution changes/batches; Storage owns Merkle/root calculation, canonical database apply and persistence. Root computation should be requested when useful rather than required by dependency on glue::stateful::Application. Existing QMDB sealed-parent batch forks need to be distinguished from any additional root-deferred execution view. Executor continues to control exact execution paths, certification and normal-path state sync; Baton remains outside that result/apply path. Body propagation should follow real Commonware broadcast/resolver/archive composition with native Multimmit adapters. Tx pool reuse must be investigated across actual ecosystem implementations, not inferred from a generic provider/queue.
+
+Four source/review waves now cover body/consensus composition, pool-to-producer mapping, concrete execution/storage APIs, Orderer proof storage, native startup/lifecycle and package identities. Current docs use existing Automaton/Relay/Reporter over buffer, generic resolver and archive for logical BlockService. Five application traits remain TxPool, Orderer, Baton, Executor and Storage. The native git workspace declares 2026.7.0 while inspected Tempo/Alto/Nunchi locks resolve registry 2026.9.0: copy wiring and adapt chosen actor source into one native graph, without silently assuming type interoperability or a release upgrade. Generic certificate Subject/Attestation/Scheme/Signers are reusable conditionally; unchanged N5f1 certificate quorum is n-f, not the execution f+1 requirement. Existing supervision supports task lifetimes but does not establish application flush or verified strict signing-material quiescence.
+
+Fourth-wave local build/migration/browser checks pass for 31 pages, 249 local links, five unchanged Rust traits, 18 reused diagrams and 39 blank choices. GitBook change request #7 (`udvqzN3QJlTBXxJ0QtPN`) is published as `VZgSSM1vxObvtUhGUVFR`: strict readback verifies 38 pages, 478 links and 94 previous anchors; live IDs/documents/file metadata match the draft. Ten documents changed, 28 stayed unchanged; no attachment upload was needed. Prior publications remain in the review history. Raw remote attachment bytes remain unconfirmed. The third batch is pushed/verified at `cd9a0864cfa2171769bbe7f6d64fa3396ca878c6`; later batch GitHub receipts are recorded separately. Native pin, no-wait behavior, exact-order/direct-imported provenance and open policies remain intact. Source sketches are uncompiled; no protocol implementation, dependency upgrade or six-hour completion is claimed.
+
+Fifth-wave source/review now makes archive identifiers/ownership and Producer admission, localized Nunchi actor adaptation, concrete pending-batch replay alternatives and runtime task placement explicit. CR8 `8Ld7JaQmvqlD1ahhTU6c` is published as `jCIYtF1KMH1WI7GnVz2Y`: 38 pages, 498 links, 98 preserved anchors; eight updated and 30 unchanged documents, all file metadata unchanged. Local build/migration/browser checks pass for 31 pages/251 links/five unchanged traits/18 diagrams/39 blank choices. [Final resolution](assets/review/commonware-reuse-20261004/wave5/DOCS_RESOLUTION.md) binds independent reviews and page hashes. The fourth batch was pushed/verified at `b5747f6a28527a4507901f2e46b426b5ff2a4b7c`; later batch Git receipts are separate. Native proof and open-policy boundaries remain; this is ongoing work within the requested six-hour window.
+
+Sixth-wave review adds the exact Tempo body propagation path, six-role reuse table, typed result exchange, public repeated sync with explicit progress/completion and storage ownership, recoverable native exact-source handoff, and existing Metadata/journal commit mechanisms. CR9 `lXj54cWzKiMbpHh5ZXR1` is published as `NFuXtAIdglYgcndKT0Ly`: 38 pages, 532 links, 98 preserved anchors; eight updated and 30 unchanged documents, all file metadata unchanged. Local build/migration/browser checks pass for 31 pages/257 links/five unchanged traits/18 diagrams/39 blank choices. [Final resolution](assets/review/commonware-reuse-20261004/wave6/DOCS_RESOLUTION.md) binds four reports, independent cross-reviews and eight final page hashes. The fifth batch was pushed/verified at `8b61492bbebdbf34dbc10e5d43c3117e19618377`; subsequent Git receipts are separate. This is ongoing work within the six-hour window, with native/application integration and policy choices still open.
+
+Seventh-wave review adds existing body codec/digest/archive interfaces, Reporter/mailbox composition, QMDB live ancestor handle ownership and storage bounds/root distinction, and dependency-aware static pool selection. CR10 `rcT3ZAPCvF24CgW3Tviy` is published as `FC0fuQHY8XibiksLncT6`: 38 pages, 551 links, 98 preserved anchors; four updated and 34 unchanged documents, all file metadata unchanged. Local build/migration/browser checks pass for 31 pages/257 links/five unchanged traits/18 diagrams/39 blank choices. [Final resolution](assets/review/commonware-reuse-20261004/wave7/DOCS_RESOLUTION.md) binds independent reviews and four final hashes. Wave6 was pushed/verified at `f2973dd98598eddac73d212c2b78e04cefb311c8`; later Git receipts are separate. The six-hour review remains active, with native/application integration and policy choices still open.
+
+Eighth-wave review adds buffer receive/subscribe, public Current value/absence proofs, optional Exact completion handles and public worker/future/strategy APIs. CR11 `3AhBcT7WpRoeqE3mFNgy` is published as `2KMSlL0AfmImuyvywE5i`: 38 pages, 566 links, 98 preserved anchors; four updated and 34 unchanged documents, all file metadata unchanged. Local build/migration/browser checks pass for 31 pages/257 links/five unchanged traits/18 diagrams/39 blank choices. [Final resolution](assets/review/commonware-reuse-20261004/wave8/DOCS_RESOLUTION.md) binds all independent reviews/final hashes. Wave7 was pushed/verified at `99dc2c456c4b318fefb368cb39a145298f7d86b7`; later Git receipts are separate. The six-hour goal remains active; integration proofs, root/query/worker choices remain open.
+
+Ninth-wave review maps existing deterministic runtime/simulated P2P/native fixtures/sync gates to future application E2E and cites actual Tempo/Alto assembly. CR12 `O83KZMexKQYIp2XEzHmj` is published as `36O47tlujxrEW9C1xjfX`: 38 pages, 580 links, 98 preserved anchors; one updated and 37 unchanged documents and all attachment metadata unchanged. Local build/migration/browser checks pass with 31 pages, 257 links, five unchanged traits, 18 diagrams and 39 blank choices. [Final resolution](assets/review/commonware-reuse-20261004/wave9/DOCS_RESOLUTION.md) binds source and independent reader reviews. Wave8 is pushed/verified at `f29c8c9e98cb9f3e9f1d90a1860ae96d52cbd2ea`; later Git receipts are separate. Nine E2E/recovery cases remain Not run and the six-hour goal remains active.
+
+Tenth-wave coherence review found no redundant body/pool/storage infrastructure prescription. Four existing prose lines now clarify Executor computation, Storage roots/application/durability, Executor ACK ownership and the Nunchi source-adaptation target. CR13 `bGFPLALFL7LTFBWj7oIU` is published as `SKpBMBP5bB8nbXs83CtR`: 38 pages, 580 links, 98 preserved anchors; four changed and 34 unchanged documents with all attachment metadata unchanged. Local build/migration/browser checks pass with 31 pages, 257 links, five traits, 18 diagrams and 39 blank application choices. [Final resolution](assets/review/commonware-reuse-20261004/wave10/DOCS_RESOLUTION.md) binds independent source/reader reviews. Wave9 is pushed/verified at `01cf73b41dedd81614237977e4edf150c7d19a81`; later Git receipts are separate. The requested six-hour review remains active.
+
+## 2026-10-04 GitBook comments and planning ownership correction
+
+Five inline comments were read at their exact Rust-interface anchors: BlockService Commonware reuse, merging TxPolicy into TxPool, Runtime ownership, ResultService decomposition/primitive reuse, and removing the redundant Planning inside Executor section. The follow-up user question corrected direction selection ownership: Baton::plan selects direction from reports; Executor handles execution-tree parents, execute/commit, canonical promotion and pruning. The previous merge mistakenly combined these two responsibilities.
+
+The public interface now has five module traits. TxPool absorbs static analyze/classify. Executor owns transaction effects and exposes sign_result, collect_result, verify_result, and result_certificate directly; Runtime and ResultService are no longer application traits. Commonware task runtime, crypto, storage, and transport primitives remain reusable beneath these contracts. Application statement verification and exact-order/input-state checks remain Executor responsibilities. All methods retain English Rust doc comments. Existing historical notes below describe earlier revisions.
+
+Commonware primitive selection is now recorded in each layer and in docs/reference/integration.md. Discovery queried commonware-library MCP v0.0.5 at explicit source v2026.9.0; native Multimmit remains pinned to 534af0ede48affd35b2111522527547b4cc9bf72. Collector/result transport, Stateful lifecycle and QMDB sync are reuse candidates with explicit compatibility and application-verification boundaries. Buffered broadcast is not durable custody; generic collector response counts are not f+1 execution certificates; one-time Stateful bootstrap sync is not repeated normal-path validator sync. No dependency or protocol implementation was changed. Published GitBook revision `TBVjJb5b1ideu6YEBXIq` matches the verified 38-page draft. See [comment and primitive checks](assets/review/comments-and-primitives-20261004/README.md).
+
+## Historical: 2026-10-04 Executor planning and execution tree
+
+The latest user decision merges Planner into Executor and removes the public reschedule method. Executor::plan evaluates bounded direction candidates; execute(block) resolves a valid execution-parent block hash, links the child, and executes through Runtime; commit(range) promotes the exact finalized path, persists it durably, and prunes conflicting branches. Compatible descendants remain pending. Physical reclamation follows worker-reference release and required recovery/query/result/state-sync retention. An execution-parent hash is distinct from a Multimmit producer-header parent; concrete hash/context binding remains open.
+
+The canonical Rust page now has eight traits, and every method has English Rust doc comments explaining its role and success boundary. Baton retains report windows, direction authentication/dissemination, and a completed prepared-policy cache. Executor owns planning, tree links, branch reuse, worker priority/fencing, canonical promotion, and pruning. Planning from a snapshot must not block commit or native cut. This is an interface/documentation change, not runtime implementation or a new native protocol proof. Published GitBook revision `DC05zLPlfWkUydJDXdiw` is verified; see [Executor tree update checks](assets/review/executor-tree-20261004/README.md).
+
+## English documentation revision
+
+The 31 active docs pages now use English, including navigation and diagram labels. Each module begins with a plain-language responsibility, then describes Rust trait inputs/outputs, call flow, and detailed completion conditions. All nine Rust declarations, pinned external source occurrences, and 39 blank policy decisions are preserved. Two stale diagram endpoints now match the already-adopted Executor responsibility: canonical outcomes originate in Executor, and Orderer delivers directly to Executor. This is documentation work, not protocol implementation or validation. GitBook updates preserve existing page identities; Markdown remains canonical without Git Sync. The English revision `QZTpgxjih7GpPhLNrfyh` is published and verified; see [publication checks](assets/review/english-docs-20261003/README.md).
+
+## 2026-10-03 GitBook 업로드 완료
+
+[Beaker / Baton](https://app.gitbook.com/o/Z5g7kwPjokG0jEOyXNu6/s/pvyFEde12m2tVRjI8TRw/) 비공개 공간에 문서 31개·섹션 안내 7개를 업로드했다. [Rust 인터페이스](https://app.gitbook.com/s/pvyFEde12m2tVRjI8TRw/overview/rust-interfaces)와 단일 Rust 파일, 18개 SVG를 함께 연결했다. 저장된 38개 페이지의 텍스트·code fence·315개 링크를 확인하고 change request를 merge했으며 published revision `9wT9dqT7E4YdDK44oElB`의 document IDs·파일 목록도 확인했다. 한글 자동 절 주소 대신 cloud 전용 명시적 절 주소를 사용한다. 원본 Markdown은 `docs/`이며 Git Sync는 연결하지 않았다. [검증 기록](assets/review/gitbook-upload-20261003/README.md)을 읽는다. 아래 미발행 설명은 각 시점의 작업 이력이다.
+
+## Rust 인터페이스 진입점
+
+사용자가 Rust 인터페이스를 찾기 어렵다고 지적하여 [Rust 인터페이스](../03-reference/02-rust-signatures.md)를 목차 상단과 시작 페이지에 배치했다. 기존 9개 trait 선언은 이 페이지를 원본으로 모으고 레이어별 상세 계약은 선언의 해당 anchor를 연결한다. 선언 본문은 그대로 유지했다. [단일 Rust 파일](../assets/interfaces/baton.rs)은 이 페이지에서 생성하며 문법을 확인했다. 실제 서비스 구현·프로토콜 검증을 수행한 것은 아니다.
+
+문서는 현재 31개 본문 페이지다. GitHub 반영과 GitBook 업로드를 각각 확인했으며, GitBook에는 목차용 섹션 안내 7개도 둔다.
+
+## 2026-10-03 GitBook 형태의 페이지별 문서
+
+페이지 분리 당시 [Baton Docs](../README.md)와 [목차](../SUMMARY.md)를 30개 페이지로 구성했다. 전체 구조, Tx, Consensus, Baton, Execution, E2E, 개발·참고자료로 나눠 각각 검토한다. `.gitbook.yaml`은 GitBook Git Sync에 연결할 구조이며 계정 연결·서비스 발행은 수행하지 않았다. 로컬 사이트 빌드와 실행은 저장소 README에 설명한다.
+
+기존 IMPLEMENTATION_SPEC.md는 이전 섹션 링크를 새 페이지로 안내하는 진입점이다. 원본 본문과 18개 그림은 [분리 직전 스냅샷](archive/2026-10-03-before-gitbook/README.md)에 보존했다. 이전 모든 본문 절과 외부 출처를 새 페이지에 대응시켰으며, 아직 Baton이 canonical 전달을 중계하는 것처럼 적힌 §5.7은 최신 Orderer → Executor 책임에 맞게 정정했다. 39개 미결정 정책 칸은 비워 둔다.
+
+아래 단일 파일 재구성 설명은 페이지 분리 전 단계의 이력이다. 현재 문서의 책임·인터페이스 설명은 각 레이어 페이지에서, 사건별 흐름은 E2E 페이지에서 수정한다. Protocol 구현·통합 증명·E2E·benchmark 결과를 추가한 작업은 아니다.
+
+## 2026-10-03 구현 문서 재구성
+
+페이지 분리 전 구현 스펙은 한 파일이었다. [원본 스냅샷](archive/2026-10-03-before-gitbook/IMPLEMENTATION_SPEC.md)을 보존했다. 사용자 지정 네 레이어(Tx-router / mempool, Native Multimmit, Baton, generic execution / QMDB)와 lifecycle sequence를 중심으로 새 개요를 정리했으며 Bank는 현재 개발 범위에서 제외한다. 미결정 정책은 빈 결정 칸으로 보존한다. 아래 Google Docs revision 표와 상세 구현 계약은 이전 snapshot의 출처이며 새 개요와 자동 동기화하지 않는다. 구현 개요의 문서 검토를 마쳤으며 protocol 구현·E2E·benchmark 결과는 없다.
+
+## Rust 인터페이스와 이름 정리
+
+현재 구현 문서의 중심 모듈은 `TxPool`, `BlockService`, `Orderer`, `Baton`, `Executor`, `Runtime`이다. `TxPolicy`, `Planner`, `ResultService`는 이 안에 조립할 수 있는 보조 trait이며 별도 actor·crate를 필수로 추가하는 결정은 아니다. 기존 controller / owner / signer 등의 표기는 구현 스펙 §1.3의 대응표에서 찾는다. Commonware의 upstream API 이름은 유지한다.
+
+§1.7은 호출 흐름과 associated type 연결을, 각 레이어의 인터페이스 절은 Rust trait 선언 초안을 보여준다. 구체 필드·codec·정책·runtime 배치는 미결정이며 native cut의 no-wait, 실행 결과 / durable 적용 / 결과 인증의 구분을 유지한다. 선언 문법 확인은 서비스 구현이나 프로토콜 실행 검증과 구분한다. 이전 문서 검토의 snapshot 기록은 이 후속 수정의 검토 기록으로 대체하지 않는다.
+
+## Executor의 state finalization / state sync 책임
+
+최신 사용자 결정에 따라 state finalization과 validator의 정상 경로 state sync는 Executor가 담당한다. 서명·인증서·change set은 Executor ↔ Executor로 직접 교환하고 ResultService는 Executor 내부 역할로 둔다. 확정 순서는 Orderer → Executor로 직접 전달하며 durable delivery ACK와 tx 결과도 Executor → Orderer / TxPool로 보낸다. Baton은 사전 실행·재실행과 report / direction을 조율하며 이 경로의 승인·중계·대기 조건이 아니다. 로컬 적용 알림은 선택적이다.
+
+「State sync: 인증된 실행 결과로 상태 동기」는 기능 방향·책임을 정한 요구사항이다. 정상 실행 도중에도 인증서와 적용 가능한 자료를 검증한 뒤 남은 실행을 줄일 수 있다. 인증서만으로 중단하거나 imported 결과에 own direct-execution signature를 추가하지 않는다. Wire / material format, 안전한 작업 전환·canonical writer·durability·recovery와 성능 검증은 구현 전 과제로 남긴다. 문서·sequence 수정은 실제 프로토콜 구현이나 안전성 증명 완료를 뜻하지 않는다.
+
+## Current document priority and historical document synchronization
+
+1. Latest explicit user decisions.
+2. [Current implementation architecture](../README.md) and [Baton research paper](baton-paper.md), each for its stated scope.
+3. Google Docs revisions below and the [archived detailed implementation specification](archive/2026-10-03-root-history/repository/research/archive/2026-10-03-implementation-outline/baton-implementation-spec.md) as provenance of the previous manual synchronization. Reconcile later revisions deliberately with current user decisions and Markdown; these snapshots do not replace the current architecture.
+4. Historical Overpass outline/design/reviews, earlier handoffs, draft PR1, toy and archive material as cited context.
+
+| Document | Native Google Doc | Verified revision |
+|---|---|---|
+| Paper: problem, mechanism, indispensable assumptions and conditional arguments, evaluation and limitations; eight sections | [Baton: Execution-Aware Ordering for Autobahn](https://docs.google.com/document/d/1PtUpMGMNMkyo1UEY2bNciJD3oIiGLRf407PW_T3Er5I/edit) | `ANLCKQmRJs9iN4rM0jd-sH8a8PE8D5cH8yKKe09aXUrk1TDg_eTC_hlTvuhi55xsE1tMpqBAhdXm9Fx3q9fP50wosMdRhe8BeNyUOj22FLg` |
+| Specification: identity/context, admission, frontier, bounds/completion, proposal/slot/recovery, signing, retention and alternatives | [Baton — 구현 스펙](https://docs.google.com/document/d/10x4RvqG8e07Tai0s20e-wpCfz8COgH0JGR5daKE1xO8/edit) | `ANLCKQldFScCUBScmgJIyaYLPQlgBG0-jI0rlb5_U3v2gX0Xu8MAXhBxHcyjHNY82H-xP142eGYXdLIhDp3KqCjj-Q226UsQGutIAR_eHK0` |
+
+The current GitHub repository is `djm07073/baton-research`; the existing local checkout name and origin remain unchanged. Historical citation titles and source URLs remain intact. These are manual counterparts, not automatic two-way synchronization. A later native revision or user decision requires deliberate reconciliation rather than overwriting either side.
+
+## What changed from the earlier repository snapshot
+
+- Renamed the conceptual project to Baton and use direction instead of plan in current narrative.
+- Replaced sum-only selection by 2f+1-supported entire-prefix first, with sum-LCP fallback and valid actual-parent base fallback. Longest selection is relative to the completed bounded admissible candidate set.
+- Precisely closed the local snapshot at 4f+1 admissions or fixed deadline, excluding excess/later reports. Local prefix uniqueness uses m<=4f+1; it does not extend to larger native recovery pools or different snapshots.
+- Made immutable ordering frontier, raw-report support, bounded candidate validation and selected/emitted/signed prefix distinctions explicit.
+- Strengthened the goal to leader/validator cut construction that preserves selected prefix membership AND exact leading sequence for the same canonical context. Pure advisory ordering over arbitrary independent native membership is insufficient for this requirement.
+- Separated implementation contracts from the eight-section paper, retaining essential native sufficiency/recovery/no-wait uncertainty and conditional reuse in the paper.
+- Kept authenticated proposal freeze, progressive native finality and the exact-order + f+1 execution-signature endpoint. Retention and common signing boundaries are required for eventual completion, not implied by cryptographic result safety.
+
+## Core preservation obligation and unresolved bridge
+
+For a selected valid prefix p protected by the adopted proposal, final executable order O after the immutable frontier must satisfy p ⪯ O in the same canonical input state/runtime. A1 and B1 membership with A1→X→B1 fails preservation of p=A1→B1. Extra native blocks cannot simply be discarded. A candidate missing a mandatory predecessor is invalid from the start.
+
+The precise boundary between advisory selection and protected authenticated adoption is not yet specified. Cut no-wait allows a prepared valid actual-parent fallback before adoption; it does not license dropping an already protected prefix. Requiring an unavailable/unadopted prefix in every ready cut conflicts with that fallback. The user adopted preservation as a high-level requirement, not a finished availability/vote-validity/continuation/recovery construction.
+
+Already-ready certified anchors are a possible native inclusion bridge; adding positive-adoption conditions to proposal/vote validity is another unadopted route. Neither has a completed cross-lane leading-prefix, no-wait or recovery proof. Do not silently force invalid/unavailable blocks, remove native extensions or restore the historical direction approval lock.
+
+## Pinned source findings and caveats
+
+Commonware commit: [`534af0ede48affd35b2111522527547b4cc9bf72`](https://github.com/commonwarexyz/monorepo/tree/534af0ede48affd35b2111522527547b4cc9bf72).
+
+- Final proposal position is the **3f+1-th greatest** position. Ordinary payload B at position j needs at least 3f+1 pool votes with position>=j for finalized position>=j. Extension carry additionally uses native n−f support when the finalized proposal position reaches proposed tip. [tips.rs](https://github.com/commonwarexyz/monorepo/blob/534af0ede48affd35b2111522527547b4cc9bf72/consensus/src/multimmit/machine/algebra/tips.rs#L143)
+- Vote position reflects local consecutive DA-voted valid path. A node may know a proposal without a local positive DA path; position 0 is then legal. [chain.rs](https://github.com/commonwarexyz/monorepo/blob/534af0ede48affd35b2111522527547b4cc9bf72/consensus/src/multimmit/machine/chain.rs#L1978), [proposal validity](https://github.com/commonwarexyz/monorepo/blob/534af0ede48affd35b2111522527547b4cc9bf72/consensus/src/multimmit/machine/view.rs#L2601)
+- In the stated f=1,n=6 ordinary-payload example, h1,h2,b report B; h2's view vote is delayed; b knows B but votes low. Pool h1,b,h3,h4,h5 has positions [1,0,0,0,0]; fourth greatest is 0. Only three honest nodes lack B. Final tip G is unsettled below B, so this does not prove permanent exclusion or arbitrary later emission. Requiring a complete DA certificate for candidate eligibility could make this example inadmissible. It is source-level analytical reasoning, not an executed protocol trace.
+- At/below a valid DA-certified anchor, B is part of the position-0 base ancestry. Low positions cannot exclude it. This distinguishes the anchor case from ordinary payload support, without proving the cross-lane leading order. [anchor selection](https://github.com/commonwarexyz/monorepo/blob/534af0ede48affd35b2111522527547b4cc9bf72/consensus/src/multimmit/machine/chain.rs#L1880)
+- Native certificates, tip history and consensus retention do not supply dense ordered delivery, policy content, emission evidence or durable marshal cursor. Recovery must preserve terminal decisions, previously emitted prefixes and protected direction prefixes. Source inspection does not close the modified native proof.
+
+## Four proposed defaults remain unadopted
+
+| Choice | Recommended proposal, not adoption | Tradeoff | Exactly what remains blocked |
+|---|---|---|---|
+| Signing boundaries | Per-block deterministic statement boundaries with canonical parent/result checkpoints | More signatures and retained intermediate state than chunks | Exact range/statement schema and common-boundary result liveness |
+| Same-supported-prefix tail | Keep valid incumbent; canonical tie-break if none | Less churn, but may give up a higher tail sum-LCP score | Deterministic tail/update rule; first-tier longest-prefix rule is already fixed |
+| Policy availability | Bounded canonical policy bytes inline in authenticated proposal | Larger proposal versus commitment-only retrieval obligations | Concrete encoding/availability/recovery interface |
+| Continuation | Finite valid initial-prefix ancestry-preserving permutation followed by original base sweep | Restricted reorder scope; compatibility and eligibility still need proof | Exact completion rule and its common-prefix proof; cannot alone guarantee native inclusion |
+
+These choices do not automatically solve or select the native prefix-adoption bridge. τ/W/budget tuning and benefit are empirical questions. No new choices were adopted during synchronization.
+
+## Draft PR1 and next validation boundary
+
+[Draft PR1](https://github.com/djm07073/overpass-research/pull/1), head `0a06faff9b859da16b31f285c28128e0768662e2`, remains unmerged and open. Its P/Q/P+ B2-extension fixture, legal-transcript checks, unresolved-slot-skip negative mutation, policy freeze/recovery/cursor checks, matching-f+1 endpoint and common-resource E2E gates remain useful. Its finite D=[B,B,A] encoding is a test candidate, not an adopted continuation or proof of selected-prefix preservation.
+
+Before treating that plan as current implementation work, add the protected-prefix adoption/inclusion/leading-order gate and verify it through native extension and view recovery. Preserve its distinction among exact-five L-QC, larger sticky pools and safe V-QC facts. No fixtures or gates were executed by this documentation update.
+
+## Checks performed for this synchronization
+
+- Re-read native revision-protected content, preserved all paper heading roles/eight sections and References, and checked the removed technical paragraphs were retained in the specification.
+- Confirmed both native cross-document Workspace chips target the right files and show Baton titles; owner-only access remained unchanged.
+- Checked final native PDF exports page by page: paper 14 pages, specification 10 pages. This is exported-PDF layout QA, not a live browser-canvas check.
+- Checked descending native rank, certified-anchor non-exclusion wording and the analytical-transcript caveats. Corrected the final-position comparison to j-or-greater and Korean naming grammar without changing decisions.
+- Markdown paragraph/citation preservation, local links, references and Git diff/whitespace are checked separately before commit. Git publication/CI status belongs in the delivery report; it is not native protocol validation.
+
+No protocol implementation, native/toy tests, protocol compilation, benchmarks, spending, credential reconfiguration or draft-PR management was performed. Future implementation requires explicit scope; do not ask again for decisions already adopted.
+
+## Targeted paper clarification: direction replies
+
+On 2026-10-02, the user chose to omit a separate direction vote/ACK/Ready quorum. Paper §§3.3, 3.4 and 4.3 now explain the no-reply flow, repeated leader-local control cycle and why approval replies introduce a barrier without certifying canonical order or execution. The native paper revision above and local baton-paper.md were checked after this targeted insertion; the specification was not edited. Native proposal votes, irrevocable order/input-state gates and f+1 execution-result signatures remain. Prefix adoption/continuation/recovery proof obligations remain open. Discussion and connector readback are preserved locally in /Users/leojin/dev/baton/archive/2026-10-03-local-material/repository/research/multimmit_fork/DIRECTION_NO_REPLY_DECISION.md and its companion update record. No commit/push, protocol implementation or runtime tests were performed by this clarification.
+
+## 2026-10-04 Eleventh reuse coverage review
+
+Wave11 independently checks the original goal and existing body/pool/Orderer/execution/Storage documentation, then cross-reviews exact final reports. [Resolution](assets/review/commonware-reuse-20261004/wave11/DOCS_RESOLUTION.md) adopts no additional reader delta. All 88 docs files match d4915b3 and the local mirror, all 115 earlier named reports match their hashes, and fresh GitBook inspection confirms unchanged SKpBMBP5bB8nbXs83CtR. Engineering/proof work stays explicit but implementation is outside the documentation completion gate. The full requested assembly/repeated-review/publication scope remains active until its 01:29:14 UTC window and completion audit. A further three-agent developer walkthrough is underway.
+
+## 2026-10-04 Twelfth developer walkthrough review
+
+Wave12 follows actual body, pool/Orderer and execution/Storage assembly paths through the current docs, then cross-reviews exact source and final reader bytes. Only TxPool::select's comment changes to distinguish candidate selection from canonical retirement; its Rust export is regenerated. [Resolution](assets/review/commonware-reuse-20261004/wave12/DOCS_RESOLUTION.md) binds all reviews and final hashes. CR14 is published sO0NK8i80XqUpnV6qDTu with 38-page strict readback/580 links/98 anchors, one page changed, 37 unchanged, all95 prior file metadata unchanged and one new Rust attachment. Local build/migration and changed-page smoke pass; other86 docs files/18 diagrams and five traits/30 methods/blank policy choices stay unchanged. Wave11 GitHub is exact a0fd3394b4a6c81e4abdcc4fb1f0865fc1c64970; later push receipts are separate. The full six-hour objective remains active until its window and completion audit; engineering implementation/proofs remain future work.
+
+## 2026-10-04 Thirteenth reused-owner seam review
+
+Wave13 traces body/candidate/dense-order, selected tx/material/canonical backend updates and execution/certification/import/writer/receipt handoffs through existing owners. [Resolution](assets/review/commonware-reuse-20261004/wave13/DOCS_RESOLUTION.md) binds exact independent reports and final two-page prose hashes. Nunchi lead names durable Executor outcomes to the existing actor; interface guide clarifies concrete ownership when by-value CommitResult reaches several consumers. No public Clone bound/API/schema/default/actor change. CR15 is publishedN5MBB3QLtVnlpTUcJESb with fresh38-page strict readback/580 links/98 anchors;two changed and36 unchanged documents,all96 file metadata unchanged/no uploads. Build/migration/two-page browser checks pass;other86 docs files/Rust/export/18 diagrams unchanged. Wave12GitHub exact78d5f2eca347b0fc04b7f7d31ff858cc2a69bee4;later receipts separate. Original full six-hour research/review/publication remains active, with future engineering/proofs outside the docs completion gate.
+
+## 2026-10-04 Fourteenth original-requirement audit
+
+[Wave14](assets/review/commonware-reuse-20261004/wave14/DOCS_RESOLUTION.md) assesses complete original architecture/roles/Rust/layer/E2E/actual-chain reuse and delivery scope with independent full-domain cross-reviews. No reader changes: existing body primitives/native callbacks, fitting whole pool candidates, exact-native Orderer bridge and Executor/Storage/result/sync boundary remain explained. Engineering/proofs/runnable bindings are explicit future work, not new documentation completion gates. All88docs equal8c75c048/localmirror; all149 preceding named reports match. Root freshly verifies exact GitHub8c75c048 and current GitBookN5MBB3QLtVnlpTUcJESb metadata identical to last verified publication; body reviewer re-evaluates saved38-page readbacks. No new CR/test/browser/raw remote byte claim. Full window01:29:14UTC and final completion audit remain pending, goal active. Later audit-only GitHub receipts recorded separately.
+
+## 2026-10-04 Six-hour Commonware reuse review final delivery
+
+The full requested19:29:14→01:29:14UTC window and fifteen source/independent-review waves are recorded in [the final audit](assets/review/commonware-reuse-20261004/wave15/ROOT_COMPLETION_AUDIT.md). Actual Tempo/Alto body composition, fitting whole pool candidates, native exact-source/Orderer bridge, direct lower QMDB Executor/Storage and full-subject f+1/normal Executor peer sync are concrete reader recipes with scoped compatibility and open engineering boundaries. The final verification clause now says selection/proposal alone does not establish canonical retirement. CR16 is publishedv2bpTwguXjQyojxMG9z7;fresh38-page readback580links/18Mermaid/98anchors and live==revieweddraft pass,all96file metadata unchanged/no uploads. One changed reader file;other87/Rust/18diagrams unchanged. Normal docs build/migration/changed-page visual checks pass. No protocol implementation/proofs/native E2E/benchmarks or backend/schema/policy defaults are completed. Final GitHub/mirror exact shipment is verified after the delivery commit before the goal is closed; this final record supersedes the earlier ongoing window notes.

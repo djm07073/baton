@@ -1,26 +1,12 @@
 flowchart TB
-    N["Consensus<br/>Multimmit Engine"] -->|"[C] Automaton::propose / verify"| M
-    N -->|"[C] Relay::broadcast<br/>Reporter::report(Activity)"| R["Existing Multimmit Marshal"]
-    M <-->|"[C] App calls stage / subscribe / fetch / ACK<br/>Marshal calls report(Update)"| R
-    subgraph APP["Application"]
-        subgraph MW["Alignment layer"]
-            M["Callback handles and Update owner"]
-            M <-->|"[P] Alignment::admit / commit(ordered)<br/>internal AlignmentPolicy::next"| S["PreCutAlignment<br/>or BatonAlignment<br/>pub(crate) implementations"]
-        end
-        P["App pool and payload code"]
-        E["App Executor<br/>execution, checkpoints and certification"]
-        C["Storage<br/>cold reads, roots and persistence"]
-        M -->|"[A] pool.select(ctx, limits)"| P
-        M <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges"| E
-        M -->|"[P] Storage::submit(executed, changes)"| C
-        C -->|"[P] StorageEvent::Prepared"| E
-        E -->|"[P] Storage::commit(verified)"| C
-        C -->|"[P] StorageEvent::Committed"| M
-        E <-->|"[P] Storage::read(view, key)<br/>pinned cold state"| C
-        C -->|"[A] via App owner<br/>execution.install_checkpoint"| E
-    end
-    C -->|"[C] apply / finalize / Barrier::durable"| Q["QMDB / DatabaseSet"]
+    W["network crate<br/>assembly and service lifetime"] -->|"[C] Engine::open / start<br/>marshal::open / Service::start"| N["Multimmit Engine + Marshal"]
+    W -->|"[A] Execution::open / start<br/>pool, alignment, storage, mailbox"| E
+    N <-->|"[C] Automaton::propose / verify<br/>Reporter::report(Update)<br/>Mailbox custody / ACK"| E["execution crate<br/>callbacks, coordination, execution<br/>checkpoints and result certification"]
+    E <-->|"[A] TxPool::admit / select / reconcile"| P["tx-pool crate<br/>retained transactions and payloads"]
+    E <-->|"[P] Alignment::admit / commit<br/>AlignmentPolicy::next"| A["alignment crate<br/>PreCut or Baton policy"]
+    E <-->|"[P] Storage::read / submit / commit<br/>verify_material / recover<br/>StorageEvent"| S["storage crate<br/>roots and certified persistence"]
+    S -->|"[C] apply / finalize / Barrier::durable"| Q["QMDB / DatabaseSet"]
     classDef reuse fill:#dbeafe,stroke:#2563eb,color:#172554;
     classDef app fill:#dcfce7,stroke:#16a34a,color:#14532d;
-    class N,R,Q reuse;
-    class M,S,P,E,C app;
+    class N,Q reuse;
+    class W,E,P,A,S app;

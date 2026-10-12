@@ -1,10 +1,10 @@
 sequenceDiagram
     participant C as Client / tx peer
     participant A as App ingress
-    participant P as App pool / payload
+    participant P as TxPool / payload
     participant W as App canonical owner
     C->>A: wire: Transaction(tx)
-    A->>P: [A] pool.admit(tx, source)
+    A->>P: [A] pool.admit(tx)
     P->>P: Bounded encoding, signature, static policy and duplicate checks
     alt Invalid transaction
         P-->>A: Admission::Rejected(reason)
@@ -15,7 +15,7 @@ sequenceDiagram
     end
     A-->>C: Admission result under chosen ingress contract
     A->>P: [A] pool.select(ctx, limits)
-    P-->>A: RetainedBatch(bytes, transaction_ids)
+    P-->>A: Payload: retained selected bytes
     Note over A,P: Selection does not retire transactions, cancellation keeps body bytes stable
     W->>W: [A] app.publish_applied(DurableApplied)
     W-->>P: [A] pool.reconcile(applied_outcomes)

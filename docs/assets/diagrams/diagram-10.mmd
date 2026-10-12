@@ -1,10 +1,10 @@
 sequenceDiagram
     participant O as Node owner
     participant M as Multimmit Marshal
-    participant A as Alignment layer / App owner
-    participant E as App Executor
+    participant A as Execution / coordination
+    participant E as Execution / execution workers
     participant S as Storage
-    A->>S: [A] state.recover(config)
+    A->>S: [P] Storage::recover()
     S-->>A: RecoveredState: checkpoint candidate and original evidence
     alt Non-genesis recovered state
         A->>E: [A] results.accept(recovered.evidence, recovered.context)

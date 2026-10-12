@@ -1,10 +1,10 @@
 sequenceDiagram
     participant P as Peer Validator App
-    participant A as Local App owner
+    participant A as Local Execution owner
     participant S as Storage
-    participant E as App Executor
+    participant E as Execution / execution workers
     participant M as Multimmit Marshal
-    Note over A,E: Local Executor is at A, certified target covers ABC
+    Note over A,E: Local Execution is at A, certified target covers ABC
     P-->>E: wire: ExecutionCertificate(statement, signatures)
     E->>E: [A] results.accept(certificate, canonical_context) -> verified or pending
     alt Invalid or unresolved irrevocable input / base
@@ -12,14 +12,14 @@ sequenceDiagram
     else VerifiedCertificate for exact input and base
         E-->>P: wire: MaterialRequest(verified_target)
         P-->>E: wire: StateMaterial(target, data, outputs)
-        E->>S: [A] state.verify_material(verified, material, base)
+        E->>S: [P] Storage::verify_material(verified, material, base)
         S-->>E: PreparedImport or unavailable / invalid
         alt Material not applicable
             Note over A: Continue direct work, no authority transfer
         else Verified applicable PreparedImport
             E->>S: [P] Storage::commit(verified)
             S-->>E: Ok(()), commit accepted, not durable
-            Note over E,S: Executor verified f+1, Storage matches material and rechecks base before mutation
+            Note over E,S: Execution verified f+1, Storage matches material and rechecks base before mutation
             alt Rejected before mutation
                 S-->>A: [P] StorageEvent::Failed(failure), no ACK
                 Note over A,S: Retain input, reconcile context, no ACK

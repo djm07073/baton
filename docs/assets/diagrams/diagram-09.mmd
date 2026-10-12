@@ -1,6 +1,6 @@
 sequenceDiagram
-    participant A as Alignment layer / App owner
-    participant E as App Executor / workers
+    participant A as Execution / coordination
+    participant E as Execution / execution workers
     participant S as Storage
     participant D as Existing QMDB / DatabaseSet
     A->>A: [A] app.dispatch_ready() -> claimed Job
@@ -23,7 +23,7 @@ sequenceDiagram
     Note over A,E: Submit accepted: next ordered unit may proceed, Storage chooses flush timing
     S->>D: [C] new_batches().await or fork_batches(sealed_parent)
     D-->>S: Concrete unmerkleized batches owned by Storage
-    S->>S: Materialize exact Executor effects under storage access fence
+    S->>S: Materialize exact Execution effects under storage access fence
     S->>D: [C] concrete_batch.merkleize().await
     D-->>S: Sealed component batches / selected commitments
     S-->>E: [P] StorageEvent::Prepared(prepared), via App routing

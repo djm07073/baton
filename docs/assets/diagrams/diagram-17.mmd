@@ -1,6 +1,6 @@
 flowchart TB
     M["Multimmit Marshal"] <-->|"[C] report(Update) / ACK"| A["App canonical owner"]
-    A <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges<br/>execution.install_checkpoint: local adoption"| E["App Executor<br/>execution, checkpoints and f+1 certification"]
+    A <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges<br/>execution.install_checkpoint: local adoption"| E["Execution workers<br/>execution, checkpoints and f+1 certification"]
     subgraph S["Storage"]
         R["Pinned read views"]
         P["Selected material and root preparation"]

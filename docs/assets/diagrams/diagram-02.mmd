@@ -1,19 +1,19 @@
 sequenceDiagram
     participant C as Client / tx peer
-    participant A as Alignment layer / App owner
+    participant A as Execution / coordination
     participant N as Multimmit Engine
     participant M as Multimmit Marshal
-    participant P as App pool / payload
-    participant E as App Executor
+    participant P as TxPool / payload
+    participant E as Execution / execution workers
     participant S as Storage
     C-->>A: wire: Transaction(tx)
-    A->>P: [A] pool.admit(tx, source)
+    A->>P: [A] pool.admit(tx)
     P-->>A: Admission
     A-->>C: Admission: selected / unselected / rejected
     N->>A: [C] Automaton::propose(ctx).await
     A-->>N: Receiver[BodyDigest]
     A->>P: [A] pool.select(ctx, limits)
-    P-->>A: RetainedBatch
+    P-->>A: Payload
     A->>A: [C] TransactionBlock::from_context(ctx, body)
     A->>M: [C] stage_block(block).await
     M-->>A: Ok(Custody): accepted, may not be durable yet

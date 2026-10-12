@@ -4,14 +4,14 @@ flowchart LR
         M1["Marshal"]
         P1["App TxPool"]
         B1["Baton Alignment"]
-        E1["Executor"]
+        E1["Execution"]
     end
     subgraph R["Node B"]
         N2["Multimmit"]
         M2["Marshal"]
         P2["App TxPool"]
         B2["Baton Alignment"]
-        E2["Executor / state import"]
+        E2["Execution / state import"]
     end
     N1 <-->|"native headers / DA / proposals / proofs"| N2
     M1 <-->|"full blocks / backfill"| M2

@@ -6,37 +6,37 @@
     {
       "name": "diagram-01",
       "title": "Application composition",
-      "width": 2481,
-      "height": 1022,
-      "source_sha256": "5d6d693e60408478d95f2260439f631952b912da1f33701739765a19c516ba2a"
+      "width": 875,
+      "height": 1060,
+      "source_sha256": "43314faf1f019516034efa3094309da80536556b664c0b0fc0930ac0fe600dbb"
     },
     {
       "name": "diagram-02",
       "title": "Full E2E: transaction input to canonical state",
       "width": 1560,
       "height": 3496,
-      "source_sha256": "197cdcfc5832fd5bd991614f93dada05abefa131a900b275d05283b62f8fe0a3"
+      "source_sha256": "f77829580ac2e7dbc90f28ddc9d959c422e4e2b63ca9fac347245aeaebfb03a4"
     },
     {
       "name": "diagram-03",
       "title": "Tx lifecycle: new, duplicate, and invalid transactions",
       "width": 927,
-      "height": 1380,
-      "source_sha256": "adf698a3aeea0da50365ac55d61728b5c688ad8b86b6b5db06a2a78e3cad3b72"
+      "height": 1363,
+      "source_sha256": "b42610e670966f6fde55a7653172ce0942c1a3d1594036395ccfe25506c01882"
     },
     {
       "name": "diagram-04",
-      "title": "Block lifecycle: mempool → propose → body dissemination",
+      "title": "Block lifecycle: mempool \u2192 propose \u2192 body dissemination",
       "width": 1348,
-      "height": 1578,
-      "source_sha256": "2cbf2f5a7e3cc0d2ec5855c9f5152b6302a4717151308c03300d9d337166e8fa"
+      "height": 1580,
+      "source_sha256": "f74b60ffaa622b32f36829006bcd0fc654d9f8a36abd98214cef0145b87f390e"
     },
     {
       "name": "diagram-05",
       "title": "Body lookup, verification, and missing-content handling",
       "width": 915,
       "height": 2578,
-      "source_sha256": "564205d1e42b0e61e9b7633d3d770642b8dd139e6621efa4f6714789aaf12b43"
+      "source_sha256": "668aa1a54a91c66794c66a65e207b0ba13640ef4f65ccfab5957fb5c81a02e03"
     },
     {
       "name": "diagram-06",
@@ -50,35 +50,35 @@
       "title": "Non-leader lifecycle: direction and branch execution",
       "width": 930,
       "height": 1908,
-      "source_sha256": "0fdfe8b3439a3998938d184089766fff6efc53d55f73948df2b7580bf59dadf8"
+      "source_sha256": "28155958c5a86d15a2d679d6972df9b7bd4f70b852105577286834fd49b7a983"
     },
     {
       "name": "diagram-08",
-      "title": "Native finality → ordered delivery → durable App application",
+      "title": "Native finality \u2192 ordered delivery \u2192 durable App application",
       "width": 1152,
       "height": 2884,
-      "source_sha256": "f35cbcf8cff1c02d740ce89315908e27467bf16abdaf6f386e13db67c983f1b4"
+      "source_sha256": "602ecee4375f7c34c0b23c4a205ba61d45ac2822b38d411091202bddfeee0e62"
     },
     {
       "name": "diagram-09",
       "title": "Execution lifecycle: QMDB branches and canonical promotion",
       "width": 951,
       "height": 3450,
-      "source_sha256": "ffec49fcf41b84ee628ec9e4d7ed8a907125e363e5dbcfa1643ce2193061cb38"
+      "source_sha256": "f7942c88c333657dc049690e32326fe8ddae615864cfd8280f9aaa34540a0d0a"
     },
     {
       "name": "diagram-10",
       "title": "Restart and backfill",
       "width": 1158,
       "height": 3300,
-      "source_sha256": "7a3b2383dc75a460f07f7e98755634dfdbca2cfa178e4208cfece2373e0a0581"
+      "source_sha256": "2cdd98be5720b6997a22200568c04b05a6d90e76ac4a2b342b01db55d53e448a"
     },
     {
       "name": "diagram-11",
       "title": "Result endpoint: direct execution and f+1 certification",
       "width": 928,
       "height": 1783,
-      "source_sha256": "a1ebf922c91001026441ebcb53df4ec57ef03e3bab907eb031cb136d7e4bed49"
+      "source_sha256": "8e534bbc85cfffd9c9e54f066fb31ac6c39f287b36392cd8c0e9f8175a7e70e7"
     },
     {
       "name": "diagram-12",
@@ -92,14 +92,14 @@
       "title": "Startup: prepare custody before native recovery",
       "width": 1560,
       "height": 2968,
-      "source_sha256": "c98b466190330cb2de8eacee2e758b32de6cf9c8860dc24f49d77db2f49f51b9"
+      "source_sha256": "82f69d55a735e3905077c9d5a22c9eaaa6828519011581519df46a26c8b39afb"
     },
     {
       "name": "diagram-14",
       "title": "State sync from certified execution results",
-      "width": 1130,
-      "height": 2281,
-      "source_sha256": "b94b79e59e370587882924365b220f4d1c9677c690a6e73f77db5506a1f2907c"
+      "width": 1126,
+      "height": 2298,
+      "source_sha256": "e65574b6c7d8266465a7f607367d6a04bbe92b52d5b251a29e2f156b622a20d0"
     },
     {
       "name": "diagram-15",
@@ -111,16 +111,16 @@
     {
       "name": "diagram-16",
       "title": "Native actors and source layout",
-      "width": 1317,
+      "width": 1293,
       "height": 706,
-      "source_sha256": "c92383213dafb3c01e055eaafa8596b6a3489eb0f98df3ca84c95dbf25da9e92"
+      "source_sha256": "dc6f95c86d573f0daea2559188f5b18ea8c6fad89bf2d0c72cccfedcdc4c579f"
     },
     {
       "name": "diagram-17",
       "title": "QMDB state and reuse boundaries",
       "width": 1093,
       "height": 1214,
-      "source_sha256": "07f00af3f8b2b5705ea288ceab0e89973b46d204a6a89e4ca72f560e79626436"
+      "source_sha256": "983a0f4c268fc605710decbf8d8d727d85ad3a351f3bc777a3686fff82e1f861"
     },
     {
       "name": "diagram-18",
@@ -133,8 +133,8 @@
       "name": "diagram-19",
       "title": "Architecture and responsibilities",
       "width": 1826,
-      "height": 974,
-      "source_sha256": "6dd06dea03d29ee3255efca65f32f6eda4cd81a4f698f0320e414fc301ed281c"
+      "height": 950,
+      "source_sha256": "8978fb1e077ccc2d70bc1dbbc87beb7cd8f78f895088416c2b908f0a02f246f2"
     },
     {
       "name": "diagram-20",
@@ -155,14 +155,14 @@
       "title": "Choose a reading path",
       "width": 1123,
       "height": 192,
-      "source_sha256": "8a62bc0856b48a9e380b892bd7ea4582cc52f0b318d6666bfa19a2a0028abd97"
+      "source_sha256": "86a379a041b8e69ff1066bcb170748c412a721746b9057726df4343f357fc9e3"
     },
     {
       "name": "diagram-23",
       "title": "Block identity and execution state",
       "width": 619,
       "height": 930,
-      "source_sha256": "e9619643006bb9ea1378b5102ff74e40bf9ce01eb022e8df723dab5da3183419"
+      "source_sha256": "f772279194305ea1d751c6ececca9dcef1f4300278a6f3c58230f35782f188a9"
     },
     {
       "name": "diagram-24",
@@ -176,14 +176,14 @@
       "title": "Delivery and two durability points",
       "width": 702,
       "height": 765,
-      "source_sha256": "f375163f9b4dcab652d85c022b508ec879ab271c3be21909cd284e35e2bce3e9"
+      "source_sha256": "84e35b06b4f3f7c5e06d7c7724292f294d4ea6a8e82d72f0632fc2803837a21c"
     },
     {
       "name": "diagram-26",
       "title": "One owner, independent work",
-      "width": 660,
+      "width": 633,
       "height": 650,
-      "source_sha256": "67f9f442a949806ef6d6b1662bdb724042d2c3efbd80812241675a4f93acada3"
+      "source_sha256": "6b56b87ca28530f9f8beb3b115989970b9ce6c69e2d23a5bbf0e6a0cc81188ae"
     },
     {
       "name": "diagram-27",
@@ -196,26 +196,26 @@
       "name": "diagram-28",
       "title": "Common scheduling interface",
       "width": 1084,
-      "height": 602,
-      "source_sha256": "96777083685091623443ac8fe7b95823b2b2c9828ba341d398750f69b068d073"
+      "height": 578,
+      "source_sha256": "c6252bfd9046f9a9023260ac2d855242add4e35ffc8001935fc3e9b0e9f9bef3"
     },
     {
       "name": "diagram-29",
       "title": "Execution, submission and memory",
       "width": 697,
       "height": 1002,
-      "source_sha256": "55215e2ccdfbb2ca8d8b2a3519bca6fb0f1cf3eea5cd381bb0c4abef6197888a"
+      "source_sha256": "5e0509effcb36c47acf07b639b80b1881a00a08eb4e9fe50be1b30ca9862c080"
     },
     {
       "name": "diagram-30",
       "title": "Prepare first, persist after certification",
       "width": 698,
       "height": 836,
-      "source_sha256": "61f1743733b766aba36a711f4f5bc6081cba82c26551608ab1ecc697bbe3ef51"
+      "source_sha256": "5267dab429938640372d5ee6754a86dc40fb3e2d5642d75e722f77ed24da6081"
     },
     {
       "name": "diagram-31",
-      "title": "What Executor certifies",
+      "title": "What Execution certifies",
       "width": 619,
       "height": 754,
       "source_sha256": "8b68e8439a271d4b0e58e4222b7673a2fa5bf78ad4232be4836d937cca6a9b7a"
@@ -225,21 +225,21 @@
       "title": "Import to checkpoint handoff",
       "width": 619,
       "height": 930,
-      "source_sha256": "8f40f82c8421ef4a8d56ebfb2ae96aef5eeeefa7ab3b8498f36ef68f5dd6ddf4"
+      "source_sha256": "033b2ad2e8ec14df526288be88dc0c742fd0996a50c6584f40ba59c12e42a3e4"
     },
     {
       "name": "diagram-33",
       "title": "Separate message planes",
-      "width": 811,
+      "width": 818,
       "height": 533,
-      "source_sha256": "00564b432172060da05b89a9e8f762bc42525e3e43c519d9df47dd8b4ff64dba"
+      "source_sha256": "e97b96fa90507dfc56de9fd588e2cef5926aa8cc627b46cfa1d1762a1b44f229"
     },
     {
       "name": "diagram-34",
       "title": "Whole path at a glance",
-      "width": 577,
-      "height": 986,
-      "source_sha256": "338b1d04844a5ab08c2d2335feeadc96471f9c1c6d7c9a2eb2f271b2d88f1926"
+      "width": 613,
+      "height": 1010,
+      "source_sha256": "98a80f2a091a021a26733139dc17ed06b1b85653b72ef62d4086a84a490d8b90"
     },
     {
       "name": "diagram-35",
@@ -253,7 +253,7 @@
       "title": "Native path at a glance",
       "width": 324,
       "height": 882,
-      "source_sha256": "d70cfffc61aede6a6306b0436b9a7cb01206732a483d3892704f4aa04e65345d"
+      "source_sha256": "5ce56ff96ccf9a7cc82961911e760480fb9d6d43afb32edc30f91fcb408d3018"
     },
     {
       "name": "diagram-37",
@@ -272,9 +272,9 @@
     {
       "name": "diagram-39",
       "title": "Ordering to ACK at a glance",
-      "width": 592,
+      "width": 596,
       "height": 906,
-      "source_sha256": "c77d7aba4ee0f052cabd85519da8b8a28bd209fd6f33ff7e5d254a60cc6dc6c5"
+      "source_sha256": "c91f47a653bcb47035c7618d78cbc4cf63a713a968f27dd519b878d2f6fd74b5"
     },
     {
       "name": "diagram-40",
@@ -286,23 +286,23 @@
     {
       "name": "diagram-41",
       "title": "Safe import at a glance",
-      "width": 805,
+      "width": 811,
       "height": 754,
-      "source_sha256": "a6154f32d7a44bdb3368a2913c4b9114879bb925a9140ac62f7772dc2cc2f1eb"
+      "source_sha256": "fca7b5b40aaec76322c0209ee8f07edc24688f2b2250215b50bd9bc21316e6d0"
     },
     {
       "name": "diagram-42",
       "title": "Two readiness conditions",
       "width": 619,
       "height": 906,
-      "source_sha256": "b1191df5558fc68487659828d9c48c5cee51903ea1edf0f05b6ea739e0ffb9f7"
+      "source_sha256": "976c29b405feb1d987cb0b6239c6fc678b6d3bb177de98a95bb2abca6758235b"
     },
     {
       "name": "diagram-43",
       "title": "Public calls and internal selection",
-      "width": 870,
-      "height": 602,
-      "source_sha256": "770dfd58305a9f807365541b24cdd5dda8b8f5653ebf52b823bf1c1c3ec1d566"
+      "width": 842,
+      "height": 578,
+      "source_sha256": "ee613fbced7b58ce4c5625452f6ff7245655f10472e62cbe17265fb2bdda02d9"
     },
     {
       "name": "diagram-44",
@@ -323,7 +323,7 @@
       "title": "Implementation dependency map",
       "width": 619,
       "height": 954,
-      "source_sha256": "01793f22e977c3c17c61239b1e2579c7e0998146e3c143a2f06551086ef286fb"
+      "source_sha256": "89974966c049598ce9f38935804807e8343359ebff271716b9c5fe21c3e4e407"
     },
     {
       "name": "diagram-47",
@@ -350,29 +350,29 @@
       "name": "diagram-50",
       "title": "Dispatch after verification",
       "width": 619,
-      "height": 826,
-      "source_sha256": "0e1c9f508165718a21728e42ddfbf2307cf5801589cfed5d5325fa26a5aa832a"
+      "height": 850,
+      "source_sha256": "44d7cf584785e417f7d58e79f0ab0778191a7ffb575a4a0a4b2f6338bda47157"
     },
     {
       "name": "diagram-51",
       "title": "Marshal report(Update): canonical input and ACK",
       "width": 931,
       "height": 1178,
-      "source_sha256": "0e726c7ccb20a956fb85979c1dca6f4c8cf5f55066f4734ff0937d4abffbc543"
+      "source_sha256": "f25968291255eac9f6923372f650defe6f44a256915562e8aa8ad02e8d925544"
     },
     {
       "name": "diagram-52",
       "title": "Modules and call flow",
-      "width": 697,
-      "height": 730,
-      "source_sha256": "ec01b85f3c96aa164b85575f018dba2358efda0a87670e793bef74cc4e8ebb3a"
+      "width": 704,
+      "height": 778,
+      "source_sha256": "70ca9d0246a9f8e4020b6e5c302e2ecb3591d263cd5101a9f089813bffec18b3"
     },
     {
       "name": "diagram-53",
       "title": "Inputs and Rust connection points",
-      "width": 595,
-      "height": 1082,
-      "source_sha256": "622972a08883edc336a707b281bb2ba662b6dbb42b3c88462cbcbbc2c56653cb"
+      "width": 585,
+      "height": 1058,
+      "source_sha256": "d182ea8c50d708217d94f342c69a77c715e794625efb55a7f5bcd55200a25f39"
     },
     {
       "name": "diagram-54",

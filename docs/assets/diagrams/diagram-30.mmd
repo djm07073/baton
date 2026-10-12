@@ -1,7 +1,7 @@
 sequenceDiagram
-    participant E as Executor
+    participant E as Execution
     participant S as Storage
-    participant A as App owner
+    participant A as Execution owner
     E->>S: [P] submit(executed, StateChanges)
     S-->>E: Ok: retained
     S-->>E: [P] Prepared(root and exact context)

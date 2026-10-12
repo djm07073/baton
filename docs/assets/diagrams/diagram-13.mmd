@@ -2,14 +2,14 @@ sequenceDiagram
     participant O as Node assembly / owner
     participant W as Existing network
     participant M as Marshal / buffer / resolver
-    participant A as Alignment layer / App owner
+    participant A as Execution / coordination
     participant N as Multimmit Engine
-    participant E as App Executor
+    participant E as Execution / execution workers
     participant S as Storage
     O->>W: [C] network.register(channel, quota)
     O->>W: [C] network.start()
-    O->>A: [A] app.open(config) -> callback handles
-    A->>S: [A] state.recover(config), or configured genesis
+    O->>A: [A] Execution::open(pool, alignment, storage) -> callback handles
+    A->>S: [P] Storage::recover(), or configured genesis
     S-->>A: RecoveredState: checkpoint candidate and original evidence
     alt Non-genesis recovered state
         A->>E: [A] results.accept(recovered.evidence, recovered.context)
@@ -37,7 +37,7 @@ sequenceDiagram
     M-->>O: Relay
     O->>M: [C] service.start(resolver_mailbox, verifier, app_output)
     M-->>O: Mailbox, ServiceHandle
-    O->>A: [A] app.start(mailbox.clone())
+    O->>A: [A] Execution::start(mailbox.clone())
     Note over M,A: Early Updates are retained, custody processing is ready before Engine open
     O->>N: [C] Engine::open(runtime, config).await
     loop Required recovery custody checks

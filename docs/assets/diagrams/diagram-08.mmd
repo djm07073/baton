@@ -1,8 +1,8 @@
 sequenceDiagram
     participant N as Multimmit Engine
     participant M as Multimmit Marshal
-    participant A as Alignment layer / Update owner
-    participant E as App Executor / workers
+    participant A as Execution / Update owner
+    participant E as Execution / execution workers
     participant S as Storage
     N->>M: [C] Reporter::report(Activity)
     Note over N,M: Existing finality, history and body backfill establish native output order
@@ -31,7 +31,7 @@ sequenceDiagram
             E->>S: [P] Storage::commit(verified)
             S-->>E: Ok(()), commit accepted, not durable
             S-->>A: [P] StorageEvent::Committed(applied) or StorageEvent::Failed(failure)
-            Note over E,S: Executor verified f+1, Storage matches material and predecessor, failure has no ACK
+            Note over E,S: Execution verified f+1, Storage matches material and predecessor, failure has no ACK
             opt Durable success
                 A->>A: [A] app.publish_applied(applied)
                 A->>E: [A] execution.install_checkpoint(applied.checkpoint)

@@ -1,0 +1,23 @@
+[package]
+name = "baton-execution"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+repository.workspace = true
+description = "Native application callbacks, execution, checkpoints and result verification"
+readme = "README.md"
+
+[dependencies]
+baton-alignment.workspace = true
+baton-tx-pool.workspace = true
+bytes.workspace = true
+thiserror.workspace = true
+commonware-actor.workspace = true
+commonware-consensus.workspace = true
+commonware-cryptography.workspace = true
+commonware-macros.workspace = true
+commonware-utils.workspace = true
+
+[lints]
+workspace = true

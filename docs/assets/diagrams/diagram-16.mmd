@@ -4,7 +4,7 @@ flowchart TB
     R["Native proof resolver"] <--> V
     V <-->|"native internal transitions"| M["Machine: producer, DA, view, finality"]
     V <--> J["Native safety journal"]
-    V -->|"[C] Automaton::propose / verify"| A["App Alignment layer<br/>callback handles"]
+    V -->|"[C] Automaton::propose / verify"| A["Execution<br/>callback handles"]
     A <-->|"[C] App calls custody / ACK<br/>Marshal calls report(Update)"| S["Existing Multimmit Marshal"]
     V -->|"[C] Reporter::report / Relay::broadcast"| S
     B["Body broadcast and backfill channels"] <--> S

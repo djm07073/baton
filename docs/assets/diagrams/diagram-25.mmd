@@ -1,7 +1,7 @@
 sequenceDiagram
     participant M as Marshal
-    participant A as App owner
-    participant S as Executor + Storage
+    participant A as Execution owner
+    participant S as Execution + Storage
     M->>A: [C] report(Update)
     A-->>M: Feedback after retaining block and ACK
     Note over M,A: Native consensus continues, delivery window is bounded

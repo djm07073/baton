@@ -1,9 +1,9 @@
 flowchart TB
     V["[C] verify succeeds<br/>valid payload + durable custody"] --> A["[P] Alignment::admit<br/>eligible live candidate only"]
-    A --> N["[P, internal] AlignmentPolicy::next<br/>F + sorted pending"]
+    A --> N["[P] AlignmentPolicy::next<br/>F + sorted pending"]
     N --> E["[A] Owner claims resources<br/>execution.execute on exact parent"]
     U["[C] report(Update)<br/>retain block + ACK token"] --> O["[P] Alignment::commit<br/>record finalized order"]
     O --> R["[A] Canonical reconcile<br/>reuse exact work or repair suffix"]
     E -.->|"compatible effects"| R
-    R --> S["[P] submit → Prepared<br/>Executor f+1 → Storage::commit"]
+    R --> S["[P] submit → Prepared<br/>Execution f+1 → Storage::commit"]
     S -->|"[P] Committed"| D["Install checkpoint<br/>ACK covered Updates"]

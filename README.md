@@ -1,35 +1,40 @@
 # Baton
 
-Start with **[Architecture](docs/01-overview/01-architecture.md)**. The implementation docs are organized in reading order: `docs/01-overview/` → `docs/02-components/` → `docs/03-e2e/`; use `docs/04-reference/` for details. The [reading guide](docs/README.md) and [full contents](docs/SUMMARY.md) follow the same order. The integration starts with one App connected to the existing Multimmit Engine and Marshal.
+Rust implementation scaffold for an App connected to Commonware Multimmit and Marshal.
+**The project compiles; `todo!()` operations are unimplemented and the node cannot run yet.**
 
-| Start here | Covers |
+Start with [developer assignments](docs/03-reference/07-development-order.md#developer-assignments), then the [architecture](docs/01-overview/01-architecture.md). Each implementation stub carries a task ID and a `Spec: README.md#...` comment resolved relative to its owning crate. [AGENTS.md](AGENTS.md) defines completion requirements.
+
+| Crate | Responsibility and specification |
 |---|---|
-| [Implementation docs](docs/README.md) · [Contents](docs/SUMMARY.md) | App-owned pool/schedulers/execution, existing native connections, E2E flows and open decisions |
-| [Rust interfaces](docs/04-reference/02-rust-signatures.md) · [Single Rust file](docs/assets/interfaces/baton.rs) | Existing Commonware API excerpts for Automaton, Relay, Reporter and Marshal |
-| [Pre-cut baseline implementation](docs/04-reference/06-precut-baseline.md) · [GitBook](https://app.gitbook.com/s/pvyFEde12m2tVRjI8TRw/baselines/precut) | Separate App scheduler mode without Baton: speculation, native ordering and incremental repair |
-| [Research paper draft](baton-paper.md) | Algorithm, conditional safety/reuse arguments, native integration obligations, evaluation plan |
+| [network](network/README.md) | Native network/Marshal assembly, configuration and runtime supervision |
+| [tx-pool](tx-pool/README.md) | Transaction admission, retained selection, payload codec and durable maintenance |
+| [alignment](alignment/README.md) | Pre-cut/Baton policies; qualified candidates, ordering and next-job selection |
+| [execution](execution/README.md) | Native callbacks, coordination, execution, checkpoints, certification and ACK |
+| [storage](storage/README.md) | Pinned reads, roots, certified persistence, import material and recovery |
+| [docs](docs/README.md) | Reading order, architecture, E2E flows, shared references and research history |
 
-The [GitBook Baton space](https://app.gitbook.com/o/Z5g7kwPjokG0jEOyXNu6/s/pvyFEde12m2tVRjI8TRw/) is private within Beaker. [Rust interfaces](https://app.gitbook.com/s/pvyFEde12m2tVRjI8TRw/overview/rust-interfaces) is a direct entry point. This App-owned integration rewrite has not been published there; read docs/ for the current design. Git Sync and automatic Google Docs synchronization are not configured.
+The root is a virtual Cargo workspace. Network assembles the runtime; Execution imports TxPool and Alignment; Storage implements the Execution-owned storage contract. Execution is generic over that contract and never imports the concrete Storage backend. TxPool and Alignment define their own input projections without depending on Execution. There is one canonical README per crate, linked from the [contents](docs/SUMMARY.md).
 
-This is design work. Protocol implementation, native integration proofs, E2E execution, and benchmarks are not complete. Existing Commonware APIs and proposed application contracts stay distinct. Open policy cells remain blank. The Bank application model is outside the current scope.
+## Validate a change
 
-Older documents and research material are preserved through the [archive index](archive/2026-10-03-root-history/README.md). Earlier implementation contracts are [archived](archive/2026-10-03-root-history/repository/research/archive/2026-10-03-implementation-outline/README.md). Historical Overpass documents are provenance, not replacements for the current design. [BATON_HANDOFF.md](BATON_HANDOFF.md) records sources and prior Google Doc revisions; [AGENTS.md](AGENTS.md) gives continuation instructions.
-
-Current integration source: [Multimmit and Marshal at 6233438985d8249d2b2bc1204191d5d405652288](https://github.com/0xEyrie/monorepo/tree/6233438985d8249d2b2bc1204191d5d405652288). The paper and historical reviews retain their earlier Commonware source pin. [Tempo Technical Overview](https://app.notion.com/p/2dfc1352439b801db5b6cf6fe21fc315?pvs=204) and [Tempo DeepWiki](https://deepwiki.com/tempoxyz/tempo) are references for presentation structure. Their Simplex / Reth / REVM implementation is not adopted.
-
-The canonical repository is [djm07073/baton-research](https://github.com/djm07073/baton-research). Existing checkout names and origin remain unchanged.
-
-## Local preview
-
-Use Node.js 20+ and Python 3 from the repository root:
+Use Rust 1.96+, nightly rustfmt, Node.js 20+, Python 3 and optionally `just`:
 
 ```sh
-npm ci
-npm run docs:check
-npm run docs:build
-npm run docs:serve
+rustup component add rustfmt --toolchain nightly
+find network/src tx-pool/src alignment/src execution/src storage/src -name '*.rs' -type f -print0 | xargs -0 rustfmt +nightly --edition 2024 --check
+cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+python3 scripts/check_scaffold.py
+npm --prefix docs ci
+npm --prefix docs run docs:check
+npm --prefix docs run docs:build
 ```
 
-The [local preview](http://127.0.0.1:8765) provides navigation, search, an in-page outline, and previous/next links. site/ is generated and excluded from Git. Edit docs/. Mermaid source and rendered assets live in docs/assets/diagrams/; diagram changes require refreshed renders and manifest.
+`just check` runs the Rust, scaffold and documentation checks; `just check-stability` checks the public ALPHA scope. `just docs` builds the documentation; `npm --prefix docs run docs:serve` serves it locally. All generated site files stay in `docs/site/`.
 
-[IMPLEMENTATION_SPEC.md](IMPLEMENTATION_SPEC.md) preserves older section links. The [pre-partition snapshot](archive/2026-10-03-before-gitbook/README.md) retains original prose and diagrams. Archived snapshots are historical and stay unchanged. [GitBook publication verification](assets/review/gitbook-upload-20261003/README.md) records the initial upload; the [English revision checks](assets/review/english-docs-20261003/README.md) record the translated update.
+`rustfmt.toml`, `clippy.toml` and `[workspace.lints]` carry the Commonware monorepo rules locally so a standalone checkout uses the same settings. Cargo does not inherit lints across independent workspaces: every Baton crate must use `[lints] workspace = true`. Nested crates use the root formatter/Clippy files without adding their own copies. Update these root rules when adopting changes from Commonware; they are not live links to a parent checkout. Baton also forbids unsafe code and temporarily permits dead code in the unfinished scaffold.
+
+Use `just fix-fmt`, `just check-fmt` and `just clippy` for focused checks. Formatting uses nightly because Commonware's import grouping options require it; compilation and Clippy use the normal Rust toolchain. `NIGHTLY_VERSION` and `RUSTFMT` override the formatting command as in Commonware. Pass every owned source file to rustfmt because `stability_mod!` declarations are not traversed by `cargo fmt`; keep archived sources under `docs/research/` out of formatting.
+
+The Commonware git dependencies share the exact spec revision `6233438985d8249d2b2bc1204191d5d405652288`; commit `Cargo.lock` changes deliberately. The lock retains `blst` 0.3.16, matching this pin; 0.3.17 changes the Pairing API and does not compile with the pinned source. This workspace builds standalone or as the `baton` submodule. Sha256/MinPk types follow the native example wiring; transaction formats, result-signing keys/threshold scheme, pool/backend policy and native Baton extension remain undecided. No VM, wire protocol, persistence behavior or protected-prefix guarantee is implemented by this scaffold.

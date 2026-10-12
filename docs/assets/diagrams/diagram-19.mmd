@@ -1,10 +1,10 @@
 flowchart TB
     N["Multimmit Engine"] -->|"[C] Automaton::propose / verify"| I
     N -->|"[C] Reporter::report(Activity)"| M["Multimmit Marshal"]
-    subgraph A["PreCut inside App"]
-        I["Alignment layer callback handles"] -->|"[A] pool.select / pool.reconcile"| T["App pool"]
-        I <-->|"[P] Alignment::admit / commit<br/>AlignmentPolicy::next (internal)"| Q["PreCutAlignment"]
-        I <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges"| E["App Executor: execution, checkpoints, f+1"]
+    subgraph A["Application configured with PreCut"]
+        I["Execution callback handles"] -->|"[A] pool.select / pool.reconcile"| T["TxPool"]
+        I <-->|"[P] Alignment::admit / commit<br/>AlignmentPolicy::next"| Q["PreCutAlignment"]
+        I <-->|"[A] execution.execute / reconcile<br/>ExecutionOutcome / StateChanges"| E["Execution workers: execution, checkpoints, f+1"]
         I -->|"[P] Storage::submit(executed, changes)"| S["Storage<br/>reads, roots and persistence"]
         S -->|"[P] StorageEvent::Prepared"| E
         E -->|"[P] Storage::commit(verified)"| S

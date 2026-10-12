@@ -3,5 +3,5 @@ flowchart TB
     O -->|"AB"| R["[A] execution.reconcile<br/>reuse exact AB or repair it"]
     R -->|"await whole unit"| S["[P] Storage::submit<br/>AB StateChanges"]
     S -->|"Ok: handoff accepted"| N["Canonical worker may take next unit"]
-    E --> K["Keep compatible C checkpoint<br/>in Executor memory"]
+    E --> K["Keep compatible C checkpoint<br/>in Execution memory"]
     D["[P] StorageEvent::Committed<br/>durable AB checkpoint"] -->|"[A] execution.install_checkpoint"| K

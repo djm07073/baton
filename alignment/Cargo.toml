@@ -1,0 +1,15 @@
+[package]
+name = "baton-alignment"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+repository.workspace = true
+description = "Pre-cut and Baton candidate scheduling policy"
+readme = "README.md"
+
+[dependencies]
+commonware-macros.workspace = true
+
+[lints]
+workspace = true

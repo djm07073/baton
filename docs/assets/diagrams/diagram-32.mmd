@@ -1,7 +1,7 @@
 flowchart TB
-    P["Peer certificate + state material"] --> V["Executor<br/>[A] results.accept"]
-    V -->|"VerifiedCertificate"| M["Storage<br/>[A] state.verify_material"]
-    M -->|"matching retained material"| C["Executor → Storage<br/>[P] commit(verified)"]
+    P["Peer certificate + state material"] --> V["Execution<br/>[A] results.accept"]
+    V -->|"VerifiedCertificate"| M["Storage<br/>[P] Storage::verify_material"]
+    M -->|"matching retained material"| C["Execution → Storage<br/>[P] commit(verified)"]
     C --> D["[P] StorageEvent::Committed<br/>usable durable checkpoint"]
     D -->|"[A] execution.install_checkpoint"| E["Skip covered work<br/>retire conflicts, keep valid descendants"]
-    D --> A["App owner<br/>ACK exactly covered Updates"]
+    D --> A["Execution owner<br/>ACK exactly covered Updates"]

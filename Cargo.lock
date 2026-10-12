@@ -241,6 +241,7 @@ dependencies = [
  "commonware-codec",
  "commonware-cryptography",
  "commonware-macros",
+ "thiserror",
 ]
 
 [[package]]

@@ -27,7 +27,7 @@ The producer header identifies the block in its lane. The execution parent ident
 | Multimmit Engine | Native producer signing, DA, leader proposal/voting, finality and safety recovery |
 | Multimmit Marshal | Complete-block custody/broadcast/backfill, ordinary native total-order interpretation, indexed delivery and durable ACK cursor |
 | Network | Assemble the five crates, native services and transport; supervise startup and shutdown |
-| TxPool | Validate/admit, retain selected/unselected candidates, select bounded bodies, reconcile canonical transaction outcomes |
+| TxPool | Classify Selected/Unselected/Invalid locally; retain/share both valid classes, select local-lane bodies and reconcile durable outcomes from all lanes |
 | Alignment: PreCut | Admit eligible pre-cut candidates, preserve started prefix and sort pending work, reconcile finalized input |
 | Alignment: Baton | The same local scheduling foundation plus intended-order reports, bounded direction selection and advisory handling |
 | Execution | Own Automaton/Update callbacks, coordination and ACK tokens; compute transaction effects and manage in-memory checkpoints; read pinned cold state, submit StateChanges with exact ordered-range metadata and install committed checkpoints |

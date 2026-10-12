@@ -44,8 +44,9 @@ sequenceDiagram
     participant S as Storage
     C-->>A: wire: Transaction(tx)
     A->>P: [A] pool.admit(tx)
-    P-->>A: Admission
-    A-->>C: Admission: selected / unselected / rejected
+    P-->>A: Ok(Admission): Selected, duplicate = false
+    A-->>C: Admission: valid transaction retained
+    Note over A,P: Both valid classes are shared, detailed admission cases follow below
     N->>A: [C] Automaton::propose(ctx).await
     A-->>N: Receiver[BodyDigest]
     A->>P: [A] pool.select(ctx, limits)
@@ -117,33 +118,43 @@ Marshal already delivers the ordinary native total order. The App reconciles ret
 ```mermaid
 sequenceDiagram
     participant C as Client / tx peer
-    participant A as App ingress
-    participant P as TxPool / payload
-    participant W as App canonical owner
+    participant A as Execution / Network ingress
+    participant P as Local TxPool
+    participant Q as Peer Network / TxPool
+    participant W as Execution canonical owner
     C->>A: wire: Transaction(tx)
-    A->>P: [A] pool.admit(tx)
-    P->>P: Bounded encoding, signature, static policy and duplicate checks
+    A->>P: [A] TxPool::admit(tx)
+    P->>P: Validate transaction and exact duplicate identity
     alt Invalid transaction
-        P-->>A: Admission::Rejected(reason)
-    else Valid selected candidate
-        P-->>A: Admission::Selected(tx_id)
-    else Valid unselected candidate
-        P-->>A: Admission::Unselected(tx_id)
+        P-->>A: Ok(Admission): Invalid, duplicate = false
+        Note over A,P: No retained payload or peer relay
+    else Already-retained valid transaction
+        P-->>A: Ok(Admission): current local class, duplicate = true
+        Note over A,P: No reinsertion or immediate relay loop
+    else Valid new transaction, capacity unavailable
+        P-->>A: Err(AdmissionError::Backpressure)
+        Note over A,P: Caller keeps tx for retry, no successful retention claim
+    else New valid transaction can be retained
+        P->>P: Retain Selected for own lane, Unselected for other lanes
+        P-->>A: Ok(Admission): local classification, duplicate = false
+        A-->>Q: wire: Transaction(tx), both valid classes
+        Q->>Q: [A] TxPool::admit(tx), classify under peer's own lane context
+        Note over P,Q: The same tx may be Selected here and Unselected there
     end
-    A-->>C: Admission result under chosen ingress contract
-    A->>P: [A] pool.select(ctx, limits)
-    P-->>A: Payload: retained selected bytes
-    Note over A,P: Selection does not retire transactions, cancellation keeps body bytes stable
+    A-->>C: Admission result under the ingress contract
+    A->>P: [A] TxPool::select(ctx, limits)
+    P-->>A: Payload from this lane's ready Selected entries
+    Note over A,P: Selection preserves bytes, Unselected stays retained and shared
     W->>W: [A] app.publish_applied(DurableApplied)
-    W-->>P: [A] pool.reconcile(applied_outcomes)
-    P->>P: Maintain chosen backend, replay missed maintenance before relying on readiness
-    Note over W,P: Pool processing does not gate canonical ACK
+    W-->>P: [A] TxPool::reconcile(PoolUpdate)
+    P->>P: Reconcile both classes from durable outcomes of any lane
+    Note over W,P: Pool maintenance does not gate canonical ACK
 ```
 
 [Open full-size diagram](../assets/diagrams/diagram-03.svg)
 
 </details>
 
-`admit` and `select` name TxPool operations called by Execution, not a new public consensus trait. Selected/unselected are logical classes; their physical representation and policy remain open. RPC and peer input use the same validation and admission policy. Duplicate suppression in one pool does not establish global exactly-once execution when multiple producers include the same transaction.
+`admit` and `select` name TxPool operations called by Execution, not a new public consensus trait. Selected, Unselected and Invalid are local transaction classes. Both valid classes are retained and shared; only Selected feeds the local lane's proposals. RPC and peer ingress recompute the class locally. Duplicate metadata and backpressure are separate from classification; physical representation and the routing algorithm remain open. Duplicate suppression in one pool does not establish global exactly-once execution when multiple producers include the same transaction.
 
 See [transaction admission and selection](../../tx-pool/README.md#pool) for the TxPool contract, the [backend survey](../03-reference/04-pool-backends.md) for reuse options, and [canonical application](06-ordered-application.md) for durable outcome handling. The node assembly is grounded in the current [log-multimmit example](https://github.com/0xEyrie/monorepo/blob/6233438985d8249d2b2bc1204191d5d405652288/examples/log-multimmit/src/node.rs#L242); its synthetic payload generator does not implement this transaction application.

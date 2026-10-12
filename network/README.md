@@ -17,6 +17,8 @@ Own configuration, construction, service lifetimes, startup readiness and superv
 
 Follow the [assembly sequence](../docs/03-reference/07-development-order.md#body-assembly-to-implement) and [startup/recovery E2E](../docs/02-e2e/09-startup-and-recovery.md). Construction parameters, backend/runtime policy and supervision remain NETWORK-01 work; `main` deliberately stops at `todo!()` until that contract is implemented.
 
+Network derives `LaneContext` from the trusted native epoch/producer configuration and the agreed routing rule, then constructs the pool with `TxPool::open(lanes)`. Supply the same context to proposal handling. Both valid classes remain available to transaction sharing; lane membership alone never justifies dropping input.
+
 ## Implementation tasks and completion
 
 **All TODO operations remain unimplemented.** Read the linked assignment for inputs, prerequisites, failure handling and acceptance tests before replacing a stub. `Spec:` paths in this crate resolve relative to its directory.
@@ -368,14 +370,14 @@ flowchart LR
     end
     N1 <-->|"native headers / DA / proposals / proofs"| N2
     M1 <-->|"full blocks / backfill"| M2
-    P1 <-->|"transactions"| P2
+    P1 <-->|"wire: Transaction(tx)<br/>Selected + Unselected"| P2
     B1 <-->|"reports / advisory direction"| B2
     E1 <-->|"attestations / certificates / material"| E2
 ```
 
 [Open full-size diagram](../docs/assets/diagrams/diagram-33.svg) · [PNG](../docs/assets/diagrams/diagram-33.png)
 
-These are logical message owners; concrete App wire codecs and channel allocation remain open. Existing Commonware Sender/Receiver handles carry the traffic.
+These are logical message owners; concrete App wire codecs and channel allocation remain open. Existing Commonware Sender/Receiver handles carry the traffic. Transaction transport shares both Selected and Unselected entries; each receiving TxPool independently validates and classifies them for its own lane. Invalid payloads are not relayed, and exact duplicate metadata suppresses repeated insertion and relay loops.
 
 <a id="networking-responsibility-and-communication"></a>
 
@@ -395,7 +397,7 @@ Commonware transport supplies authenticated peer connections and registered chan
 | Native resolver | Native view proofs and recovery material | `3` |
 | Marshal resolver | Exact block/history/certificate backfill | `4` |
 | Marshal broadcast | Complete `TransactionBlock` values with header and body | `5` |
-| App transactions | Bounded transaction messages / inventory according to selected pool policy | Undecided |
+| App transactions | Bounded messages / inventory covering both Selected and Unselected valid transactions | Undecided |
 | App Baton reports / direction | Signed intended-order reports, window context and advisory direction | Undecided |
 | App execution results / state sync | Exact statements, signatures, result certificates, material and queries | Undecided |
 
@@ -433,7 +435,7 @@ Bound complete encoded messages and outstanding requests/subscriptions, not only
 
 | Diagram label | Contract / definition |
 |---|---|
-| `Transaction(tx)` | Bounded transaction input admitted under the [pool contract](../tx-pool/README.md#pool); transport receipt is not admission or inclusion. |
+| `Transaction(tx)` | Share both valid transaction classes under the [pool contract](../tx-pool/README.md#pool). The receiver recomputes validity and local lane classification; transport receipt is not retention or inclusion. |
 | `WindowAnnouncement(context, deadline)` | Baton report-window context and fixed closure deadline under the [report rules](../alignment/README.md#alignment); authentication and exact context checks are required. |
 | `SignedReport(context, intended_order)` | Original authenticated intended-order report, counted once per eligible identity in the fixed window; not execution evidence. |
 | `SignedDirection(context, order)` | Authenticated advisory direction under the same context; [pending-order rules](../docs/02-e2e/05-direction-and-execution.md) constrain adoption. It does not establish native finality. |

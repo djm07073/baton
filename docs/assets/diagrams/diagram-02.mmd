@@ -8,8 +8,9 @@ sequenceDiagram
     participant S as Storage
     C-->>A: wire: Transaction(tx)
     A->>P: [A] pool.admit(tx)
-    P-->>A: Admission
-    A-->>C: Admission: selected / unselected / rejected
+    P-->>A: Ok(Admission): Selected, duplicate = false
+    A-->>C: Admission: valid transaction retained
+    Note over A,P: Both valid classes are shared, detailed admission cases follow below
     N->>A: [C] Automaton::propose(ctx).await
     A-->>N: Receiver[BodyDigest]
     A->>P: [A] pool.select(ctx, limits)

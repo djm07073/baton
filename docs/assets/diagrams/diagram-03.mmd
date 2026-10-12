@@ -1,23 +1,33 @@
 sequenceDiagram
     participant C as Client / tx peer
-    participant A as App ingress
-    participant P as TxPool / payload
-    participant W as App canonical owner
+    participant A as Execution / Network ingress
+    participant P as Local TxPool
+    participant Q as Peer Network / TxPool
+    participant W as Execution canonical owner
     C->>A: wire: Transaction(tx)
-    A->>P: [A] pool.admit(tx)
-    P->>P: Bounded encoding, signature, static policy and duplicate checks
+    A->>P: [A] TxPool::admit(tx)
+    P->>P: Validate transaction and exact duplicate identity
     alt Invalid transaction
-        P-->>A: Admission::Rejected(reason)
-    else Valid selected candidate
-        P-->>A: Admission::Selected(tx_id)
-    else Valid unselected candidate
-        P-->>A: Admission::Unselected(tx_id)
+        P-->>A: Ok(Admission): Invalid, duplicate = false
+        Note over A,P: No retained payload or peer relay
+    else Already-retained valid transaction
+        P-->>A: Ok(Admission): current local class, duplicate = true
+        Note over A,P: No reinsertion or immediate relay loop
+    else Valid new transaction, capacity unavailable
+        P-->>A: Err(AdmissionError::Backpressure)
+        Note over A,P: Caller keeps tx for retry, no successful retention claim
+    else New valid transaction can be retained
+        P->>P: Retain Selected for own lane, Unselected for other lanes
+        P-->>A: Ok(Admission): local classification, duplicate = false
+        A-->>Q: wire: Transaction(tx), both valid classes
+        Q->>Q: [A] TxPool::admit(tx), classify under peer's own lane context
+        Note over P,Q: The same tx may be Selected here and Unselected there
     end
-    A-->>C: Admission result under chosen ingress contract
-    A->>P: [A] pool.select(ctx, limits)
-    P-->>A: Payload: retained selected bytes
-    Note over A,P: Selection does not retire transactions, cancellation keeps body bytes stable
+    A-->>C: Admission result under the ingress contract
+    A->>P: [A] TxPool::select(ctx, limits)
+    P-->>A: Payload from this lane's ready Selected entries
+    Note over A,P: Selection preserves bytes, Unselected stays retained and shared
     W->>W: [A] app.publish_applied(DurableApplied)
-    W-->>P: [A] pool.reconcile(applied_outcomes)
-    P->>P: Maintain chosen backend, replay missed maintenance before relying on readiness
-    Note over W,P: Pool processing does not gate canonical ACK
+    W-->>P: [A] TxPool::reconcile(PoolUpdate)
+    P->>P: Reconcile both classes from durable outcomes of any lane
+    Note over W,P: Pool maintenance does not gate canonical ACK

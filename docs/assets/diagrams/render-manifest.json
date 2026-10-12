@@ -13,16 +13,16 @@
     {
       "name": "diagram-02",
       "title": "Full E2E: transaction input to canonical state",
-      "width": 1560,
-      "height": 3496,
-      "source_sha256": "f77829580ac2e7dbc90f28ddc9d959c422e4e2b63ca9fac347245aeaebfb03a4"
+      "width": 1559,
+      "height": 3553,
+      "source_sha256": "6979b1b187cb3f0669a1543ebea35d6bbc7103a5b418b0eaf54a5a75e15e1d61"
     },
     {
       "name": "diagram-03",
       "title": "Tx lifecycle: new, duplicate, and invalid transactions",
-      "width": 927,
-      "height": 1363,
-      "source_sha256": "b42610e670966f6fde55a7653172ce0942c1a3d1594036395ccfe25506c01882"
+      "width": 1125,
+      "height": 1981,
+      "source_sha256": "caf8895ef398f23ff6d3d1aa885e03f078965f872a580c232834470b308727c2"
     },
     {
       "name": "diagram-04",
@@ -188,9 +188,9 @@
     {
       "name": "diagram-27",
       "title": "Transaction lifecycle",
-      "width": 580,
-      "height": 810,
-      "source_sha256": "1a37039fd197b6f693a56b42734e4f66b5176802cc394a2fff963edd35ac36c5"
+      "width": 1072,
+      "height": 1885,
+      "source_sha256": "5a70d8b44bd62f186d7460ef7c14d60c889cd73d536a7e9ca9dadce0f45243a4"
     },
     {
       "name": "diagram-28",
@@ -232,7 +232,7 @@
       "title": "Separate message planes",
       "width": 818,
       "height": 533,
-      "source_sha256": "e97b96fa90507dfc56de9fd588e2cef5926aa8cc627b46cfa1d1762a1b44f229"
+      "source_sha256": "cb109cb89709736b096cda824d2dab196518d90130f386a4208eeffc92ff926f"
     },
     {
       "name": "diagram-34",

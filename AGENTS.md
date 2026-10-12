@@ -19,6 +19,7 @@
 
 ## Required invariants
 
+- TxPool classifies Selected/Unselected/Invalid locally. Retain and share both valid classes; only Selected feeds local proposals. Lane mismatch is never invalidity or a discard reason. Keep duplicate metadata and retryable backpressure separate, and reconcile both classes from durable outcomes across all lanes.
 - `Automaton::verify(true)` means valid payload and durable custody. Missing data stays pending; speculative execution and result certification never delay the verdict.
 - Retain every accepted Marshal Update and Exact token. `Reporter::report` performs a synchronous handoff; `Backoff` cannot recover a dropped Update.
 - `Alignment::commit` records finalized ordering only. `next` selects; the Execution owner rechecks and claims exact parent/runtime/attempt/resources before launch. Preserve started F and sort only eligible pending work.

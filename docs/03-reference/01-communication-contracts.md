@@ -243,7 +243,9 @@ These are logical contracts, **not new Rust struct definitions or wire schemas**
 
 | Diagram value | Meaning |
 |---|---|
-| `Admission`, `Payload` | Pool classification or selected bounded transactions. Selection retains transactions; neither value means canonical inclusion. |
+| `LaneContext`, `SelectionContext` | Trusted epoch/local optional lane/producer set/shared assignment rule, and the matching native proposal context. Routing rules remain open. |
+| `TransactionClass`, `Admission`, `AdmissionError` | Selected and Unselected are valid retained/shared transactions; Invalid is not retained or relayed. Admission includes duplicate metadata; Backpressure preserves caller retry ownership and is not invalidity. |
+| `Payload` | A bounded batch from this lane's ready Selected transactions. Selection preserves retention and does not imply canonical inclusion. |
 | `PayloadVerdict` | `Valid`, permanent `Invalid`, or `Pending` for unavailable dependencies. It describes payload validity, separately from custody and speculative eligibility. |
 | `Candidate` | Exact producer block/context plus the validity, custody and authentication facts available to App. The owner rechecks current lifecycle/ancestry/eligibility before scheduling. |
 | `Job`, `job_id` | Exact block, completed valid execution parent, canonical base, runtime and input prefix, bound to a claimed local attempt and reserved resources. The producer's lane parent is not the execution parent. |
@@ -287,9 +289,10 @@ These rows explain behavior and completion behind the diagrams. Helper names are
 
 | Proposed call | Owner and return | Completion, waiting and failure contract |
 |---|---|---|
-| `pool.admit(tx)` | TxPool → `Admission` | Validate/classify selected, unselected or rejected input. Duplicates follow pool policy. Admission persistence and selection policy remain open. |
-| `pool.select(ctx, limits)` | TxPool → `Payload` | Select bounded eligible transactions without removing them as committed. |
-| `pool.reconcile(applied_outcomes)` | TxPool maintenance | Reconcile from durable canonical outcomes; schedule after publication, without making pool maintenance another ACK approval. |
+| `TxPool::open(lanes)` | Network → TxPool | Inject trusted LaneContext; keep local assignment and shared routing independent of Execution/Storage internals. |
+| `pool.admit(tx)` | TxPool → `Result<Admission, AdmissionError>` | Classify Selected/Unselected/Invalid locally. Retain and share both valid classes; duplicates return their current class with separate metadata. Backpressure is retryable and cannot become Invalid. |
+| `pool.select(ctx, limits)` | TxPool → `Payload` | Select ready Selected transactions for the matching epoch/lane within limits; retain both valid classes. |
+| `pool.reconcile(applied_outcomes)` | TxPool maintenance | Reconcile both valid classes from durable outcomes across all lanes; schedule after publication without another ACK approval. |
 | `app.check_payload(ctx, full_block)` | App payload code → `PayloadVerdict` | Check exact header/body/digest and application validity. Temporary absence stays pending; state-dependent transaction outcomes are handled by execution. |
 | `app.admit_candidate(candidate)` | Execution owner → admitted, deferred, already known or ineligible | Recheck origin/role, live lifecycle, exact identity, ancestry/authentication and applied state. Preserve `F`; sort only eligible pending work. Saturated speculation does not make a valid custody verdict false. |
 | `app.dispatch_ready()` | Execution owner → claimed `Job` or no work | Choose an eligible pending input with a completed valid exact parent and resources. Bind/claim the attempt before launching; missing parent/capacity stays pending. |

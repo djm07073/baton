@@ -41,7 +41,7 @@ Keep the runtime cases below as **Not run** until task implementations and their
 
 | Component | Required scenarios and assertions | App execution status |
 |---|---|---|
-| Pool / propose | Valid/invalid/duplicate tx; selected/unselected retention; bounded batch; canceled proposal; selection does not imply canonical retirement; body digest and supplied producer context match | Not run |
+| Pool / propose | Selected/Unselected/Invalid classification; Unselected on A shared to assigned B as Selected; both valid classes retained/served; Invalid not relayed; exact duplicates do not loop; retryable backpressure; context reclassification without lane-based loss; bounded local-lane batch; canceled proposal; selection does not imply canonical retirement; body digest and supplied producer context match | Not run |
 | Custody / verify | Header-before-body and body-before-header; permanent invalidity vs temporary absence; wrong digest/context; accepted stage before durable completion; recovery reads matching retained body | Not run |
 | Verify admission | Remote eligible block, local pre-sign check and startup recovery serviced before Engine::open returns; duplicate/canceled/stale completion, including remote rescheduling after closure; parent still pending its verdict; exact contextual deduplication; no false new-peer event; speculative queue pressure never becomes invalid verdict | Not run |
 | Scheduling independence | Verify true after valid durable custody while execution is blocked; healthy native progress while App speculative worker is stalled; body I/O remains the promised custody fence; ready canonical work reaches durable ACK under sustained optional backlog | Not run |
